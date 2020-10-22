@@ -24,37 +24,55 @@ lut_kop <- c("Af",  "Am",  "As" , "Aw",  "BWk", "BWh" ,"BSk" ,"BSh" ,"Cfa" ,
 
 names(lut_kop)<-c(11:14,  21,  22,  26,  27,  31:39,  41:52,  61,62)
 
-lut_kop <- c("Af"=11,
-              "Am"=12,
-              "As"=13,
-              "Aw" = 14,
-              "BWk" =21,
-              "BWh" = 22,
-              "BSk" = 26,
-              "BSh" = 27,
-              "Cfa" = 31,
-             "Cfb" = 32 ,
-              "Cfc" = 33,
-              "Csa" = 34,
-              "Csb" = 35,
-              "Csc" = 36,
-              "Cwa" = 37,
-              "Cwb" = 38,
-              "Cwc" = 39,
-              "Dfa" = 41,
-              "Dfb" = 42,
-              "Dfc" = 43,
-              "Dfd" = 44,
-              "Dsa" = 45,
-              "Dsb" = 46,
-              "Dsc" = 47,
-              "Dsd" = 48,
-              "Dwa" = 49,
-              "Dwb" = 50,
-              "Dwc" = 51,
-              "Dwd" = 52,
-              "EF" = 61,
-              "ET" = 62)
+lut_lc<-c( "Evergreen Needleleaf Forests",
+ "Evergreen Broadleaf Forests",
+ "Deciduous Needleleaf Forests",
+ "Deciduous Broadleaf Forests",
+ "Mixed Forests",
+ "Closed Shrublands",
+ "Open Shrublands",
+ "Woody Savannas",
+ "Savannas",
+ "Grasslands",
+ "Permanent Wetlands",
+ "Croplands",
+ "Urban and Built-up Lands",
+ "Cropland/Natural  Vegetation  Mosaics",
+ "Permanent Snow and Ice",
+ "Barren",
+ "Water Bodies")
+names(lut_lc) <- 1:17
+# lut_kop <- c("Af"=11,
+#               "Am"=12,
+#               "As"=13,
+#               "Aw" = 14,
+#               "BWk" =21,
+#               "BWh" = 22,
+#               "BSk" = 26,
+#               "BSh" = 27,
+#               "Cfa" = 31,
+#              "Cfb" = 32 ,
+#               "Cfc" = 33,
+#               "Csa" = 34,
+#               "Csb" = 35,
+#               "Csc" = 36,
+#               "Cwa" = 37,
+#               "Cwb" = 38,
+#               "Cwc" = 39,
+#               "Dfa" = 41,
+#               "Dfb" = 42,
+#               "Dfc" = 43,
+#               "Dfd" = 44,
+#               "Dsa" = 45,
+#               "Dsb" = 46,
+#               "Dsc" = 47,
+#               "Dsd" = 48,
+#               "Dwa" = 49,
+#               "Dwb" = 50,
+#               "Dwc" = 51,
+#               "Dwd" = 52,
+#               "EF" = 61,
+#               "ET" = 62)
 kop <- st_read("data/koppen")
 kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE", fun="max")
 
@@ -115,15 +133,26 @@ ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
   geom_text(x=as.factor(19), y=750, label=nrow(na_lc)%>%formatC(big.mark = ","))
 
 # splitting up events by landcover and latitude ================================
-
+lut_clim<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
+names(lut_clim)<-c("A", "B", "C", "D", "E")
 test<-na_lc %>%
   rbind(sa_lc)%>%
   dplyr::select(-gldas) %>%
   na.omit() %>%
   mutate(kop_c=lut_kop[as.character(koppen)],
-         main_clim=str_sub(kop_c,1,1))
+         lc_c = lut_lc[as.character(lc)],
+         main_clim=lut_clim[str_sub(kop_c,1,1)])
 
-ggplot(test, aes(x=main_clim, group=lc)) +
+ggplot(test, aes(x=main_clim, fill=lc_c)) +
   geom_bar(stat="count", position="dodge") +
   scale_y_continuous(labels=scales::label_comma())
+
+dir.create("data/lc_splits")
+for (i in test$main_clim){
+  for( j in test$lc){
+    test %>%
+      filter(main_clim == i & lc == j) %>%
+      st_write(paste0("data/lc_splits/clim_",i,"_lc_",j,".gpkg"))
+  }
+}
 
