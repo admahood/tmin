@@ -8,6 +8,7 @@ install.packages("exactextractr");library(exactextractr)
 download.file("https://ldas.gsfc.nasa.gov/sites/default/files/ldas/gldas/VEG/GLDASp4_domveg_025d.nc4",
               "data/gldas.nc4")
 gldas <- raster("data/gldas.nc4")
+NAvalue(gldas) <- 0
 years <- 2016:2019
 
 na <- st_read("data/fired_na_2017-nids.gpkg") %>%
@@ -17,7 +18,7 @@ res<-list()
 for(y in 1:length(years)){
   lcfiles <- list.files("data/MCD12Q1_mosaics/", full.names = TRUE)
   r <- raster(lcfiles[[y]])
-  r[r==0] <- NA
+  NAvalue(r) <- 0
   res[[y]] <- na %>%
     filter(lc_year == years[y]) %>%
     mutate(lc = exact_extract(x=r,y= ., 'mode'))
@@ -37,7 +38,7 @@ res<-list()
 for(y in 1:length(years)){
   lcfiles <- list.files("data/MCD12Q1_mosaics/", full.names = TRUE)
   r <- raster(lcfiles[[y]])
-  r[r == 0] <- NA
+  NAvalue(r) <- 0
   res[[y]] <- sa %>%
     filter(lc_year == years[y]) %>%
     mutate(lc = exact_extract(x=r,y= ., 'mode'))
