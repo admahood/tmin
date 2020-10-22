@@ -49,3 +49,12 @@ sa_lc<- do.call('rbind',res) %>%
   mutate(gldas = exact_extract(x=gldas, y=., 'mode'))
 st_write(sa_lc, "data/fired_sa_2017-nids_lc.gpkg", delete_dsn = TRUE)
 system("aws s3 cp data/fired_sa_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_sa_2017-nids_lc.gpkg")
+
+# trying to figure out gldas
+na_tundra <- na_lc %>%
+  filter(gldas > 17)
+
+ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
+  geom_bar(stat="count", position="dodge", color="black") +
+  scale_fill_brewer(palette = "Paired") +
+  geom_text(x=as.factor(19), y=750, label=nrow(na_lc)%>%formatC(big.mark = ","))
