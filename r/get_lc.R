@@ -28,7 +28,7 @@ for(y in 1:length(years)){
 na_lc<- do.call('rbind',res) %>%
   dplyr::select(-lc_year) %>%
   mutate(gldas = exact_extract(x=gldas, y=., 'mode'))
-st_write(na_lc, "data/fired_na_2017-nids_lc.gpkg")
+st_write(na_lc, "data/fired_na_2017-nids_lc.gpkg", delete_dsn = TRUE)
 system("aws s3 cp data/fired_na_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_na_2017-nids_lc.gpkg")
 
 # sa 
@@ -44,6 +44,7 @@ for(y in 1:length(years)){
 }
 
 sa_lc<- do.call('rbind',res) %>%
-  dplyr::select(-lc_year)
+  dplyr::select(-lc_year)%>%
+  mutate(gldas = exact_extract(x=gldas, y=., 'mode'))
 st_write(sa_lc, "data/fired_sa_2017-nids_lc.gpkg")
 system("aws s3 cp data/fired_sa_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_sa_2017-nids_lc.gpkg")
