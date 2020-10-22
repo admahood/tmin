@@ -1,5 +1,6 @@
 # getting landcover for fired events
 
+# Setup and data prep ==================
 system("aws s3 sync s3://earthlab-natem/modis-burned-area/input/landcover/MCD12Q1_mosaics data/MCD12Q1_mosaics")
 
 library(sf);library(tidyverse); library(raster)
@@ -30,23 +31,23 @@ unzip(zipfile = "data/koppen.zip", exdir = "data/koppen")
 #               "Csa" = 34,
 #               "Csb" = 35,
 #               "Csc" = 36,
-#               37 = "Cwa",
-#               38 = "Cwb",
-#               39 = "Cwc",
-#               41 = "Dfa",
-#               42 = "Dfb",
-#               43 = "Dfc",
-#               44 = "Dfd",
-#               45 = "Dsa",
-#               46 = "Dsb",
-#               47 = "Dsc",
-#               48 = "Dsd",
-#               49 = "Dwa",
-#               50 = "Dwb",
-#               51 = "Dwc",
-#               52 = "Dwd",
-#               61 = "EF",
-#               62 = "ET")
+#               "Cwa" = 37,
+#               "Cwb" = 38,
+#               "Cwc" = 39,
+#               "Dfa" = 41,
+#               "Dfb" = 42,
+#               "Dfc" = 43,
+#               "Dfd" = 44,
+#               "Dsa" = 45,
+#               "Dsb" = 46,
+#               "Dsc" = 47,
+#               "Dsd" = 48,
+#               "Dwa" = 49,
+#               "Dwb" = 50,
+#               "Dwc" = 51,
+#               "Dwd" = 52,
+#               "EF" = 61,
+#               "ET" = 62)
 
 kop <- st_read("data/koppen")
 kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE")
@@ -54,6 +55,8 @@ kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE")
 NAvalue(gldas) <- 0
 years <- 2016:2019
 
+
+# The business ============
 na <- st_read("data/fired_na_2017-nids.gpkg") %>%
   mutate(lc_year = as.numeric(str_sub(first_date_7,1,4))-1)
 
