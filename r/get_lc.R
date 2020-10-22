@@ -161,6 +161,26 @@ ggplot(test, aes(x=main_clim, fill=lc_c)) +
   geom_bar(stat="count", position="dodge") +
   scale_y_continuous(labels=scales::label_comma())
 
+dir.create("data/tallys")
+test%>%
+  st_set_geometry(NULL) %>%
+  group_by(lc_c) %>%
+  summarise(n=n()) %>%
+  ungroup() %>%
+  write_csv("data/tallys/event_tallys_lc.csv")
+
+test%>%
+  st_set_geometry(NULL) %>%
+  group_by(main_clim,lc_c) %>%
+  summarise(n=n())%>%
+  write_csv("data/tallys/event_tallys_kop_lc.csv")
+
+test%>%
+  st_set_geometry(NULL) %>%
+  group_by(kop_c,lc_c) %>%
+  summarise(n=n())%>%
+  write_csv("data/tallys/event_tallys_kopfull_lc.csv")
+
 dir.create("data/lc_splits")
 for (i in unique(test$main_clim)){
   for( j in unique(test$lc_c)){
@@ -171,3 +191,4 @@ for (i in unique(test$main_clim)){
   }
 }
 system("aws s3 sync data/lc_splits s3://earthlab-amahood/night_fires/lc_splits")
+system("aws s3 sync data/tallys s3://earthlab-amahood/night_fires/tallys")
