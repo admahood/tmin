@@ -16,43 +16,50 @@ gldas <- raster("data/gldas.nc4")
 download.file("http://koeppen-geiger.vu-wien.ac.at/data/1976-2000_GIS.zip",
               "data/koppen.zip")
 unzip(zipfile = "data/koppen.zip", exdir = "data/koppen")
-# 
-# lut_kop <- c("Af"=11,
-#               "Am"=12,
-#               "As"=13,
-#               "Aw" = 14,
-#               "BWk" =21,
-#               "BWh" = 22,
-#               "BSk" = 26,
-#               "BSh" = 27,
-#               "Cfa" = 31,
-#              "Cfb" = 32 ,
-#               "Cfc" = 33,
-#               "Csa" = 34,
-#               "Csb" = 35,
-#               "Csc" = 36,
-#               "Cwa" = 37,
-#               "Cwb" = 38,
-#               "Cwc" = 39,
-#               "Dfa" = 41,
-#               "Dfb" = 42,
-#               "Dfc" = 43,
-#               "Dfd" = 44,
-#               "Dsa" = 45,
-#               "Dsb" = 46,
-#               "Dsc" = 47,
-#               "Dsd" = 48,
-#               "Dwa" = 49,
-#               "Dwb" = 50,
-#               "Dwc" = 51,
-#               "Dwd" = 52,
-#               "EF" = 61,
-#               "ET" = 62)
 
+lut_kop <- c("Af",  "Am",  "As" , "Aw",  "BWk", "BWh" ,"BSk" ,"BSh" ,"Cfa" ,
+             "Cfb", "Cfc" ,"Csa", "Csb" ,"Csc" ,"Cwa", "Cwb", "Cwc", "Dfa",
+             "Dfb","Dfc", "Dfd" ,"Dsa" ,"Dsb" ,"Dsc" ,"Dsd" ,"Dwa" ,"Dwb" ,
+             "Dwc" ,"Dwd" ,"EF",  "ET" )
+
+names(lut_kop)<-c(11:14,  21,  22,  26,  27,  31:39,  41:52,  61,62)
+
+lut_kop <- c("Af"=11,
+              "Am"=12,
+              "As"=13,
+              "Aw" = 14,
+              "BWk" =21,
+              "BWh" = 22,
+              "BSk" = 26,
+              "BSh" = 27,
+              "Cfa" = 31,
+             "Cfb" = 32 ,
+              "Cfc" = 33,
+              "Csa" = 34,
+              "Csb" = 35,
+              "Csc" = 36,
+              "Cwa" = 37,
+              "Cwb" = 38,
+              "Cwc" = 39,
+              "Dfa" = 41,
+              "Dfb" = 42,
+              "Dfc" = 43,
+              "Dfd" = 44,
+              "Dsa" = 45,
+              "Dsb" = 46,
+              "Dsc" = 47,
+              "Dsd" = 48,
+              "Dwa" = 49,
+              "Dwb" = 50,
+              "Dwc" = 51,
+              "Dwd" = 52,
+              "EF" = 61,
+              "ET" = 62)
 kop <- st_read("data/koppen")
-kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE")
+kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE", fun="max")
 
 NAvalue(gldas) <- 0
+NAvalue(kop_r) <- 0
 years <- 2016:2019
 
 
@@ -109,5 +116,14 @@ ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
 
 # splitting up events by landcover and latitude ================================
 
+test<-na_lc %>%
+  rbind(sa_lc)%>%
+  dplyr::select(-gldas) %>%
+  na.omit() %>%
+  mutate(kop_c=lut_kop[as.character(koppen)],
+         main_clim=str_sub(kop_c,1,1))
 
+ggplot(test, aes(x=main_clim, group=lc)) +
+  geom_bar(stat="count", position="dodge") +
+  scale_y_continuous(labels=scales::label_comma())
 
