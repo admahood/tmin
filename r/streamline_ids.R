@@ -64,4 +64,4 @@ write_csv(na_vpd, "data/na_vpd_long_2017-nids.csv")
 system("aws s3 cp data/na_vpd_long_2017-nids.csv s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv")
 rm(na_vpd)
 
-# getting landcover ============================================================
+
