@@ -15,14 +15,24 @@ gldas <- raster("data/gldas.nc4")
 # http://koeppen-geiger.vu-wien.ac.at/shifts.htm
 download.file("http://koeppen-geiger.vu-wien.ac.at/data/1976-2000_GIS.zip",
               "data/koppen.zip")
+
+download.file("https://ndownloader.figshare.com/files/12407516",
+              "data/koppen.zip")
 unzip(zipfile = "data/koppen.zip", exdir = "data/koppen")
 
-lut_kop <- c("Af",  "Am",  "As" , "Aw",  "BWk", "BWh" ,"BSk" ,"BSh" ,"Cfa" ,
-             "Cfb", "Cfc" ,"Csa", "Csb" ,"Csc" ,"Cwa", "Cwb", "Cwc", "Dfa",
-             "Dfb","Dfc", "Dfd" ,"Dsa" ,"Dsb" ,"Dsc" ,"Dsd" ,"Dwa" ,"Dwb" ,
-             "Dwc" ,"Dwd" ,"EF",  "ET" )
-
-names(lut_kop)<-c(11:14,  21,  22,  26,  27,  31:39,  41:52,  61,62)
+# lut_kop <- c("Af",  "Am",  "As" , "Aw",  "BWk", "BWh" ,"BSk" ,"BSh" ,"Cfa" ,
+#              "Cfb", "Cfc" ,"Csa", "Csb" ,"Csc" ,"Cwa", "Cwb", "Cwc", "Dfa",
+#              "Dfb","Dfc", "Dfd" ,"Dsa" ,"Dsb" ,"Dsc" ,"Dsd" ,"Dwa" ,"Dwb" ,
+#              "Dwc" ,"Dwd" ,"EF",  "ET" )
+# koppen from https://www.nature.com/articles/sdata2018214#Sec8
+lut_kop <- c("Af",  "Am", "Aw",   
+             "BWh" ,"BWk","BSh" ,"BSk" ,
+             "Csa", "Csb" ,"Csc" ,"Cwa", "Cwb", "Cwc","Cfa" , "Cfb", "Cfc" ,
+             "Dsa" ,"Dsb" ,"Dsc" ,"Dsd","Dwa" ,"Dwb" ,"Dwc" ,"Dwd" ,
+             "Dfa", "Dfb","Dfc", "Dfd" , 
+             "ET",   "EF")
+names(lut_kop)<-c(1:30)
+# names(lut_kop)<-c(11:14,  21,  22,  26,  27,  31:39,  41:52,  61,62)
 
 lut_lc<-c( "Evergreen Needleleaf Forests",
  "Evergreen Broadleaf Forests",
@@ -37,7 +47,7 @@ lut_lc<-c( "Evergreen Needleleaf Forests",
  "Permanent Wetlands",
  "Croplands",
  "Urban and Built-up Lands",
- "Cropland/Natural  Vegetation  Mosaics",
+ "Cropland/Natural Vegetation Mosaics",
  "Permanent Snow and Ice",
  "Barren",
  "Water Bodies")
@@ -73,11 +83,13 @@ names(lut_lc) <- 1:17
 #               "Dwd" = 52,
 #               "EF" = 61,
 #               "ET" = 62)
-kop <- st_read("data/koppen")
-kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE", fun="max")
+# kop <- st_read("data/koppen")
+# kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE", fun="max")
+
+kop_r <- raster('data/koppen/Beck_KG_V1_present_0p0083.tif')
 
 NAvalue(gldas) <- 0
-NAvalue(kop_r) <- 0
+NAvalue(kop_r) <- -Inf
 years <- 2016:2019
 
 
@@ -124,13 +136,13 @@ st_write(sa_lc, "data/fired_sa_2017-nids_lc.gpkg", delete_dsn = TRUE)
 system("aws s3 cp data/fired_sa_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_sa_2017-nids_lc.gpkg")
 
 # trying to figure out gldas ===== moral of the story - don't bother ===========
-na_tundra <- na_lc %>%
-  filter(gldas > 17)
-
-ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
-  geom_bar(stat="count", position="dodge", color="black") +
-  scale_fill_brewer(palette = "Paired") +
-  geom_text(x=as.factor(19), y=750, label=nrow(na_lc)%>%formatC(big.mark = ","))
+# na_tundra <- na_lc %>%
+#   filter(gldas > 17)
+# 
+# ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
+#   geom_bar(stat="count", position="dodge", color="black") +
+#   scale_fill_brewer(palette = "Paired") +
+#   geom_text(x=as.factor(19), y=750, label=nrow(na_lc)%>%formatC(big.mark = ","))
 
 # splitting up events by landcover and latitude ================================
 lut_clim<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
@@ -141,18 +153,21 @@ test<-na_lc %>%
   na.omit() %>%
   mutate(kop_c=lut_kop[as.character(koppen)],
          lc_c = lut_lc[as.character(lc)],
-         main_clim=lut_clim[str_sub(kop_c,1,1)])
+         main_clim=lut_clim[str_sub(kop_c,1,1)],
+         lc_c = str_replace_all(lc_c," ","_"),
+         lc_c = str_replace_all(lc_c,"/","_"))
 
 ggplot(test, aes(x=main_clim, fill=lc_c)) +
   geom_bar(stat="count", position="dodge") +
   scale_y_continuous(labels=scales::label_comma())
 
 dir.create("data/lc_splits")
-for (i in test$main_clim){
-  for( j in test$lc){
-    test %>%
-      filter(main_clim == i & lc == j) %>%
-      st_write(paste0("data/lc_splits/clim_",i,"_lc_",j,".gpkg"))
+for (i in unique(test$main_clim)){
+  for( j in unique(test$lc_c)){
+    outfile<-paste0(i,"_",j,".gpkg")
+    out<- test %>%
+      filter(main_clim == i & lc_c == j) 
+    if(nrow(out)>0) st_write(out, paste0("data/", "lc_splits/", outfile), delete_dsn=TRUE)
   }
 }
-
+system("aws s3 sync data/lc_splits s3://earthlab-amahood/night_fires/lc_splits")
