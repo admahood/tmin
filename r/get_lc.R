@@ -4,10 +4,53 @@ system("aws s3 sync s3://earthlab-natem/modis-burned-area/input/landcover/MCD12Q
 
 library(sf);library(tidyverse); library(raster)
 install.packages("exactextractr");library(exactextractr)
+install.packages("fasterize");library(fasterize)
 
 download.file("https://ldas.gsfc.nasa.gov/sites/default/files/ldas/gldas/VEG/GLDASp4_domveg_025d.nc4",
               "data/gldas.nc4")
 gldas <- raster("data/gldas.nc4")
+
+# koppen climate classes:
+# http://koeppen-geiger.vu-wien.ac.at/shifts.htm
+download.file("http://koeppen-geiger.vu-wien.ac.at/data/1976-2000_GIS.zip",
+              "data/koppen.zip")
+unzip(zipfile = "data/koppen.zip", exdir = "data/koppen")
+# 
+# lut_kop <- c("Af"=11,
+#               "Am"=12,
+#               "As"=13,
+#               "Aw" = 14,
+#               "BWk" =21,
+#               "BWh" = 22,
+#               "BSk" = 26,
+#               "BSh" = 27,
+#               "Cfa" = 31,
+#              "Cfb" = 32 ,
+#               "Cfc" = 33,
+#               "Csa" = 34,
+#               "Csb" = 35,
+#               "Csc" = 36,
+#               37 = "Cwa",
+#               38 = "Cwb",
+#               39 = "Cwc",
+#               41 = "Dfa",
+#               42 = "Dfb",
+#               43 = "Dfc",
+#               44 = "Dfd",
+#               45 = "Dsa",
+#               46 = "Dsb",
+#               47 = "Dsc",
+#               48 = "Dsd",
+#               49 = "Dwa",
+#               50 = "Dwb",
+#               51 = "Dwc",
+#               52 = "Dwd",
+#               61 = "EF",
+#               62 = "ET")
+
+kop <- st_read("data/koppen")
+kop_r<- fasterize(sf=kop, raster = gldas, field="GRIDCODE")
+
 NAvalue(gldas) <- 0
 years <- 2016:2019
 
@@ -26,7 +69,8 @@ for(y in 1:length(years)){
 
 na_lc<- do.call('rbind',res) %>%
   dplyr::select(-lc_year) %>%
-  mutate(gldas = exact_extract(x=gldas, y=., 'mode'))
+  mutate(gldas = exact_extract(x=gldas, y=., 'mode'),
+         koppen = exact_extract(x=kop_r, y=., 'mode'))
 st_write(na_lc, "data/fired_na_2017-nids_lc.gpkg", delete_dsn = TRUE)
 system("aws s3 cp data/fired_na_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_na_2017-nids_lc.gpkg")
 
@@ -34,23 +78,24 @@ system("aws s3 cp data/fired_na_2017-nids_lc.gpkg s3://earthlab-amahood/night_fi
 sa <- st_read("data/fired_sa_2017-nids.gpkg") %>%
   mutate(lc_year = as.numeric(str_sub(first_date_7,1,4))-1)
 
-res<-list()
+res_s<-list()
 for(y in 1:length(years)){
   lcfiles <- list.files("data/MCD12Q1_mosaics/", full.names = TRUE)
   r <- raster(lcfiles[[y]])
   NAvalue(r) <- 0
-  res[[y]] <- sa %>%
+  res_s[[y]] <- sa %>%
     filter(lc_year == years[y]) %>%
     mutate(lc = exact_extract(x=r,y= ., 'mode'))
 }
 
-sa_lc<- do.call('rbind',res) %>%
+sa_lc<- do.call('rbind',res_s) %>%
   dplyr::select(-lc_year)%>%
-  mutate(gldas = exact_extract(x=gldas, y=., 'mode'))
+  mutate(gldas = exact_extract(x=gldas, y=., 'mode'),
+         koppen = exact_extract(x=kop_r, y=., 'mode'))
 st_write(sa_lc, "data/fired_sa_2017-nids_lc.gpkg", delete_dsn = TRUE)
 system("aws s3 cp data/fired_sa_2017-nids_lc.gpkg s3://earthlab-amahood/night_fires/fired_sa_2017-nids_lc.gpkg")
 
-# trying to figure out gldas
+# trying to figure out gldas ===== moral of the story - don't bother ===========
 na_tundra <- na_lc %>%
   filter(gldas > 17)
 
@@ -58,3 +103,8 @@ ggplot(na_tundra, aes(x=as.factor(gldas), fill = as.factor(lc))) +
   geom_bar(stat="count", position="dodge", color="black") +
   scale_fill_brewer(palette = "Paired") +
   geom_text(x=as.factor(19), y=750, label=nrow(na_lc)%>%formatC(big.mark = ","))
+
+# splitting up events by landcover and latitude ================================
+
+
+
