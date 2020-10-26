@@ -36,10 +36,9 @@ for(i in 1:length(fired_files)){
   counter<-1
   system(paste("echo", out_file))
   
-  # fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
-    fc<-foreach(f = 1:150, .combine= bind_rows)%dopar%{
+  fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
+    # fc<-foreach(f = 1:150, .combine= bind_rows)%dopar%{
       
-    system(paste("echo", round(f/nrow(fired)*100,2)))
     
     goes <- goes_files %>%
       dplyr::filter(date >= fired[f,]$first_date_7)%>%
@@ -60,6 +59,7 @@ for(i in 1:length(fired_files)){
         filter(is_fire > 0) 
       
       if(nrow(ints)>0){
+        system(paste("echo", round(f/nrow(fired)*100,2), "%", out_file))
         fire_counts <- ints %>%
           st_set_geometry(NULL) %>%
           group_by(rounded_datetime) %>%
