@@ -36,7 +36,9 @@ for(i in 1:length(fired_files)){
   counter<-1
   system(paste("echo", out_file))
   
-  fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
+  # fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
+    fc<-foreach(f = 1:150, .combine= bind_rows)%dopar%{
+      
     system(paste("echo", round(f/nrow(fired)*100,2)))
     
     goes <- goes_files %>%
@@ -69,8 +71,9 @@ for(i in 1:length(fired_files)){
     }
   }
   # bind_rows(fire_counts) %>%
+  print(Sys.time()-t0)
+    
   write_csv(fc,file.path("data","out", out_file))
   system(paste0("aws s3 cp ", file.path("data","out", out_file), 
                 " s3://earthlab-amahood/night_fires/goes_counts/", out_file))
-  print(Sys.time()-t0)
 }
