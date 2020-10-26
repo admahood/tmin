@@ -24,7 +24,7 @@ dir.create("data/out")
 corz <- detectCores()-1
 registerDoParallel(corz)
 
-foreach(i = fired_files){
+foreach(i = 1:length(fired_files))%dopar%{
   
   fired<- st_read(fired_files[i])
   
@@ -33,33 +33,36 @@ foreach(i = fired_files){
     str_replace("data/fired/", "")
   
   fire_counts <- list()
+  counter<-1
   for(f in 1:nrow(fired)){
     goes <- goes_files %>%
       dplyr::filter(date >= fired[f,]$first_date_7)%>%
       dplyr::filter(date <= fired[f,]$last_date_7)
     
-    glist<- list()
-    for(g in 1:nrow(goes)) {
+    if(nrow(goes)>0){
+      glist<- list()
+      for(g in 1:nrow(goes)) {
+        glist[[g]] <- read_csv(file.path("data","goes16",goes$filename[g]), col_types = c("TTdddddddddd"))%>%
+            dplyr::select(-cellindex, -x,-y,-Area,-Temp,-Power, -DQF,-scan_center)
+      }
+
+      ints <- bind_rows(glist) %>%
+        st_as_sf(coords=c("sinu_x", "sinu_y"), crs=st_crs(fired)) %>%
+        mutate(is_fire = st_intersects(big_thing, fired[f,],sparse = F) %>%
+                 rowSums()) %>%
+        filter(is_fire > 0) 
       
-      glist[[g]] <- read_csv(file.path("data","goes16",goes$filename[g]), col_types = c("TTdddddddddd"))%>%
-          dplyr::select(-cellindex, -x,-y,-Area,-Temp,-Power, -DQF,-scan_center)# %>%
-          # mutate(date = goes[g,]$date,
-          #        hour = goes[g,]$hour)
+      if(nrow(ints)>0){
+        fire_counts[[counter]] <- ints %>%
+          st_set_geometry(NULL) %>%
+          group_by(rounded_datetime) %>%
+          dplyr::summarise(n=n()) %>%
+          mutate(nid = fired[f,]$nid)
+        counter<-counter+1
+        system(paste("echo", counter))
         
+      }
     }
-    big_thing<-bind_rows(glist) %>%
-      st_as_sf(coords=c("sinu_x", "sinu_y"), crs=st_crs(fired))
-    
-    ecos3 <- big_thing %>%
-      mutate(is_fire = st_intersects(big_thing, fired[f,],sparse = F) %>%
-               rowSums())%>%
-      filter(is_fire > 0) 
-    
-    fire_counts[[f]]%>%
-      st_set_geometry(NULL) %>%
-      group_by(rounded_datetime) %>%
-      dplyr::summarise(n=n()) %>%
-      mutate(nid = fired[f,]$nid)
   }
   bind_rows(fire_counts) %>%
     write_csv(file.path("data","out", out_file))
