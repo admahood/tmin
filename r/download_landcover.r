@@ -7,7 +7,7 @@ library(RCurl)
 dir.create("data/MCD12Q1", recursive=TRUE)
 # input your username and password here as character strings
 uu <- "admahood" 
-pp <-
+# pp <-
 
 u_p <- paste0(uu,":",pp)
 # define tiles
