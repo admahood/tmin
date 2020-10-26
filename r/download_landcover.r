@@ -98,7 +98,8 @@ for (y in 1:length(years)) {
     system(paste(
       "aws s3 sync",
       file.path(local_data, years[y]),
-      file.path(s3_path, years[y])
+      file.path(s3_path, years[y]),
+      "--only-show-errors"
     ))
     unlink(file.path(local_data, years[y]), recursive = TRUE)
     print(Sys.time() - t0)
