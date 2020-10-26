@@ -25,8 +25,9 @@ registerDoParallel(corz)
 
 for(i in 1:length(fired_files)){
   
+  t0<- Sys.time()
   fired<- st_read(fired_files[i])
-  
+  fired_crs <- st_crs(fired)
   out_file <- fired_files[i] %>%
     str_replace(".gpkg", ".csv") %>%
     str_replace("data/fired/", "")
@@ -36,6 +37,7 @@ for(i in 1:length(fired_files)){
   system(paste("echo", out_file))
   
   fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
+    system(paste("echo", round(f/nrow(fired)*100,2)))
     
     goes <- goes_files %>%
       dplyr::filter(date >= fired[f,]$first_date_7)%>%
@@ -46,8 +48,11 @@ for(i in 1:length(fired_files)){
     if(length(goes)>0){
       tbl <- goes %>% 
         map_df(~read_csv(., col_types = c("TTdddddddddd")))%>%
-        dplyr::select(rounded_datetime, Mask, sinu_x, sinu_y)%>%
-        st_as_sf(coords=c("sinu_x", "sinu_y"), crs=st_crs(fired))%>%
+        dplyr::select(rounded_datetime, Mask, sinu_x, sinu_y) %>%
+        na.omit()%>%
+        st_as_sf(coords=c("sinu_x", "sinu_y"), crs=fired_crs)
+      
+      ints<- tbl%>%
         mutate(is_fire = st_intersects(., fired[f,],sparse = F) %>%
                  rowSums()) %>%
         filter(is_fire > 0) 
@@ -66,6 +71,6 @@ for(i in 1:length(fired_files)){
   # bind_rows(fire_counts) %>%
   write_csv(fc,file.path("data","out", out_file))
   system(paste0("aws s3 cp ", file.path("data","out", out_file), 
-                " s3://earthlab-amahood/night_fires/goes_counts/", out_file
-  ))
+                " s3://earthlab-amahood/night_fires/goes_counts/", out_file))
+  print(Sys.time()-t0)
 }
