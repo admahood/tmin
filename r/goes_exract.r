@@ -32,10 +32,6 @@ for(i in 1:length(fired_files)){
     str_replace(".gpkg", ".csv") %>%
     str_replace("data/fired/", "")
   
-  fire_counts <- list()
-  counter<-1
-  system(paste("echo", out_file))
-  
   fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
     # fc<-foreach(f = 1:150, .combine= bind_rows)%dopar%{
       
@@ -70,7 +66,6 @@ for(i in 1:length(fired_files)){
       }
     }
   }
-  # bind_rows(fire_counts) %>%
   print(Sys.time()-t0)
   
   if(!is.null(fc)){  
