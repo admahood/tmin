@@ -3,10 +3,11 @@ library(httr)
 library(tidyverse)
 library(RCurl)
 
-dir.create("data/MCD12Q1")
+
+dir.create("data/MCD12Q1", recursive=TRUE)
 # input your username and password here as character strings
 uu <- "admahood" 
-pp <- "Ulmac323"
+pp <-
 
 u_p <- paste0(uu,":",pp)
 # define tiles
