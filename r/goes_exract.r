@@ -72,8 +72,9 @@ for(i in 1:length(fired_files)){
   }
   # bind_rows(fire_counts) %>%
   print(Sys.time()-t0)
-    
+  
+  if(!is.null(fc)){  
   write_csv(fc,file.path("data","out", out_file))
   system(paste0("aws s3 cp ", file.path("data","out", out_file), 
-                " s3://earthlab-amahood/night_fires/goes_counts/", out_file))
+                " s3://earthlab-amahood/night_fires/goes_counts/", out_file))}
 }
