@@ -1,8 +1,10 @@
 # streamline ids for NA and SA
 library(tidyverse) ; library(sf); library(vroom)
 
-system("aws s3 sync s3://earthlab-amahood/night_fires data")
+system("aws s3 sync s3://earthlab-amahood/night_fires/fired_polys data")
 
+
+# polygons =====================================================================
 # sa first
 
 sa<- st_read("data/fired_sa_2017-.gpkg") %>%
@@ -20,7 +22,7 @@ sa %>%
   mutate(lat = st_coordinates(st_transform(st_centroid(.), 4326))[,2])%>%
   st_write("data/fired_sa_2017-nids.gpkg", delete_dsn=TRUE)
 
-system("aws s3 cp data/fired_sa_2017-nids.gpkg s3://earthlab-amahood/night_fires/fired_sa_2017-nids.gpkg")
+system("aws s3 cp data/fired_sa_2017-nids.gpkg s3://earthlab-amahood/night_fires/fired_polys/fired_sa_2017-nids.gpkg")
 
 rm(sa)
 # north america
@@ -39,11 +41,11 @@ na %>%
          nid = lut_naids[id] %>% as.numeric(),
          id = as.numeric(id)) %>%
   mutate(lat = st_coordinates(st_transform(st_centroid(.), 4326))[,2]) %>%
-  st_write("data/fired_na_2017-nids.gpkg")
-system("aws s3 cp data/fired_na_2017-nids.gpkg s3://earthlab-amahood/night_fires/fired_na_2017-nids.gpkg")
+  st_write("data/fired_na_2017-nids.gpkg", delete_dsn=T)
+system("aws s3 cp data/fired_na_2017-nids.gpkg s3://earthlab-amahood/night_fires/fired_polys/fired_na_2017-nids.gpkg")
 
 rm(na)
-# now vpd monsters
+# now vpd monsters =============================================================
 sa_vpd <- vroom("data/sa_vpd_long_2017-test.csv") %>%
   mutate(fireID=as.character(fireID),
          nid = lut_saids[fireID],
@@ -54,13 +56,16 @@ system("aws s3 cp data/sa_vpd_long_2017-nids.csv s3://earthlab-amahood/night_fir
 rm(sa_vpd)
 gc()
 
+system("aws s3 cp s3://earthlab-amahood/night_fires/na_vpd_long_2017-.csv data/na_vpd_long_2017-.csv")
+system("aws s3 cp s3://earthlab-amahood/night_fires/luts.Rda data/luts.Rda")
+load("data/luts.Rda")
+
 na_vpd <- vroom("data/na_vpd_long_2017-.csv") %>%
   mutate(fireID=as.character(fireID),
-         nid = lut_saids[fireID],
+         nid = lut_naids[fireID],
          fireID=as.numeric(fireID),
          nid=as.numeric(nid))
-write_csv(na_vpd, "data/na_vpd_long_2017-nids.csv")
-
+vroom_write(na_vpd, "data/na_vpd_long_2017-nids.csv")
 system("aws s3 cp data/na_vpd_long_2017-nids.csv s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv")
 rm(na_vpd)
 
@@ -70,11 +75,12 @@ system("aws s3 cp s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv da
 system("aws s3 cp s3://earthlab-amahood/night_fires/sa_vpd_long_2017-nids.csv data/sa.csv")
 system("aws s3 sync s3://earthlab-amahood/night_fires/lc_splits data/lc_splits")
 
-library(data.table)
-# na<- fread("data/na.csv")
-# sa<- fread("data/sa.csv")
+files <- list.files("data", full.names = TRUE, pattern = ".csv")[c(2,4)]
+wh <- vroom(files) 
 
-wh <- bind_rows(fread("data/na.csv"),fread("data/sa.csv"))
+wh %>% 
+  separate(hour, into = c("day", "hour"),sep="_",) %>%
+  vroom_write("data/wh_vpd.csv")
 
 dir.create("data/vpd_lc")
 fired_files <- list.files("data/lc_splits", pattern = ".gpkg", full.names = TRUE)
@@ -86,6 +92,9 @@ ids <- st_read(f) %>%
 
 out_fn <- str_replace(f, "lc_splits", "vpd_lc") %>%
   str_replace(".gpkg", "_vpds_.csv")
+
+filter(wh, nid %in% ids) %>%
+  write_csv(file.path("vpd_lc", out_fn))
 
 
 
