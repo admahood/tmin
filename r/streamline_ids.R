@@ -64,4 +64,28 @@ write_csv(na_vpd, "data/na_vpd_long_2017-nids.csv")
 system("aws s3 cp data/na_vpd_long_2017-nids.csv s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv")
 rm(na_vpd)
 
+# joining vpd csvs, then splitting by landcover and koppen ========
+
+system("aws s3 cp s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv data/na.csv")
+system("aws s3 cp s3://earthlab-amahood/night_fires/sa_vpd_long_2017-nids.csv data/sa.csv")
+system("aws s3 sync s3://earthlab-amahood/night_fires/lc_splits data/lc_splits")
+
+library(data.table)
+# na<- fread("data/na.csv")
+# sa<- fread("data/sa.csv")
+
+wh <- bind_rows(fread("data/na.csv"),fread("data/sa.csv"))
+
+dir.create("data/vpd_lc")
+fired_files <- list.files("data/lc_splits", pattern = ".gpkg", full.names = TRUE)
+
+for(f in fired_files){}
+
+ids <- st_read(f) %>%
+  pull(nid)
+
+out_fn <- str_replace(f, "lc_splits", "vpd_lc") %>%
+  str_replace(".gpkg", "_vpds_.csv")
+
+
 
