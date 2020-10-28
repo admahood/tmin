@@ -78,23 +78,42 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/lc_splits data/lc_splits")
 files <- list.files("data", full.names = TRUE, pattern = ".csv")[c(2,4)]
 wh <- vroom(files) 
 
-wh %>% 
-  separate(hour, into = c("day", "hour"),sep="_",) %>%
-  vroom_write("data/wh_vpd.csv")
+# wh <- wh %>% 
+#   separate(hour, into = c("day", "hour"),sep="_",) # maybe do this in smaller chunks
+
+vroom_write(wh, "data/wh_vpd.csv")
+system("aws s3 cp data/wh_vpd.csv s3://earthlab-amahood/night_fires/wh_vpd.csv")
+
 
 dir.create("data/vpd_lc")
 fired_files <- list.files("data/lc_splits", pattern = ".gpkg", full.names = TRUE)
 
-for(f in fired_files){}
+for(f in fired_files){
 
-ids <- st_read(f) %>%
+firez<- st_read(f)
+
+lut_dates <- firez$first_date_7
+names(lut_dates) <- firez$nid
+
+ids <- firez %>%
   pull(nid)
 
-out_fn <- str_replace(f, "lc_splits", "vpd_lc") %>%
-  str_replace(".gpkg", "_vpds_.csv")
+out_fn <- str_replace(f, "lc_splits", "") %>%
+  str_replace(".gpkg", "_vpds.csv") %>%
+  str_replace_all("/", "") %>%
+  str_replace("data", "")
 
-filter(wh, nid %in% ids) %>%
-  write_csv(file.path("vpd_lc", out_fn))
+subsettt <- filter(wh, nid %in% ids) %>%
+  separate(hour, into = c("day", "hour"), sep="_", convert=TRUE) %>%
+  mutate(first_date = as.Date(lut_dates[as.character(nid)]),
+         date = first_date + day)
 
+vroom_write(subsettt, file.path("data", "vpd_lc", out_fn))
+system(paste("aws s3 cp",
+             file.path("data", "vpd_lc", out_fn),
+             file.path("s3://earthlab-amahood", "night_fires","vpd_lc",out_fn)))
+
+rm(subsettt);gc()
+}
 
 
