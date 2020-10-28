@@ -87,9 +87,15 @@ system("aws s3 cp data/wh_vpd.csv s3://earthlab-amahood/night_fires/wh_vpd.csv")
 
 dir.create("data/vpd_lc")
 fired_files <- list.files("data/lc_splits", pattern = ".gpkg", full.names = TRUE)
+out_files<- list.files("data/vpd_lc", pattern = "csv")
+wh<- vroom("data/wh_vpd.csv")
 
 for(f in fired_files){
-
+  out_fn <- str_replace(f, "lc_splits", "") %>%
+    str_replace(".gpkg", "_vpds.csv") %>%
+    str_replace_all("/", "") %>%
+    str_replace("data", "")
+  if(!file.exists(file.path("data","vpd_lc",out_fn))){
   firez<- st_read(f)
   
   lut_dates <- firez$first_date_7
@@ -98,11 +104,9 @@ for(f in fired_files){
   ids <- firez %>%
     pull(nid)
   
-  out_fn <- str_replace(f, "lc_splits", "") %>%
-    str_replace(".gpkg", "_vpds.csv") %>%
-    str_replace_all("/", "") %>%
-    str_replace("data", "")
   
+  
+ 
   subsettt <- filter(wh, nid %in% ids) %>%
     separate(hour, into = c("day", "hour"), sep="_", convert=TRUE) %>%
     mutate(first_date = as.Date(lut_dates[as.character(nid)]),
@@ -114,6 +118,7 @@ for(f in fired_files){
                file.path("s3://earthlab-amahood", "night_fires","vpd_lc",out_fn)))
   
   rm(subsettt); rm(firez);gc()
+  }
 }
 
 
