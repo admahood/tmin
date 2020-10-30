@@ -69,7 +69,7 @@ vroom_write(na_vpd, "data/na_vpd_long_2017-nids.csv")
 system("aws s3 cp data/na_vpd_long_2017-nids.csv s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv")
 rm(na_vpd)
 
-# joining vpd csvs, then splitting by landcover and koppen ========
+# joining vpd csvs, then splitting by landcover and koppen =====================
 
 system("aws s3 cp s3://earthlab-amahood/night_fires/na_vpd_long_2017-nids.csv data/na.csv")
 system("aws s3 cp s3://earthlab-amahood/night_fires/sa_vpd_long_2017-nids.csv data/sa.csv")
@@ -125,6 +125,9 @@ for(f in fired_files){
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/vpd_lc data/vpd_lc")
 system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_counts")
+system(str_c("aws s3 sync ",
+             file.path("s3://earthlab-amahood","night_fires","gamready")),
+             file.path("data", "out"))
 
 vpd_files <- list.files("data/vpd_lc", pattern=".csv")
 goes_files <- list.files("data/goes_counts", pattern = ".csv")
@@ -135,6 +138,7 @@ for(f in vpd_files){
   if(!file.exists(file.path("data", "out", str_replace(f, "vpds", "gamready")))){
   if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
   print(f)
+  gc()
   vpds <- vroom(file.path("data", "vpd_lc",f))%>%
     mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
     dplyr::select(nid, VPD_hPa, rounded_datetime)
