@@ -132,19 +132,25 @@ goes_files <- list.files("data/goes_counts", pattern = ".csv")
 dir.create("data/out")
 
 for(f in vpd_files){
+  if(!file.exists(file.path("data", "out", str_replace(f, "vpds", "gamready")))){
   if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
   print(f)
-  vroom(file.path("data", "vpd_lc",f))%>%
+  vpds <- vroom(file.path("data", "vpd_lc",f))%>%
     mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
-    dplyr::select(nid, VPD_hPa, rounded_datetime)%>%
-    left_join(vroom(file.path("data", "goes_counts",str_replace(f, "_vpds", ""))) %>%
-                dplyr::filter(nid %in% .$nid)
-              , by = c("nid", "rounded_datetime")) %>%
-    replace_na(list(n=0))%>%
-    vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
+    dplyr::select(nid, VPD_hPa, rounded_datetime)
   
-  system(str_c("aws s3 cp ",
-               file.path("data", "out", str_replace(f, "vpds", "gamready")),
-               file.path("s3://earthlab-amahood","night_fires","gamready",
-                         str_replace(f, "vpds", "gamready"))))
-  }}
+  goes <- vroom(file.path("data", "goes_counts",str_replace(f, "_vpds", "")))
+  
+  if(nrow(goes)>0){
+    goes %>%
+      left_join(vpds %>%
+                  dplyr::filter(nid %in% vpds$nid)
+                , by = c("nid", "rounded_datetime")) %>%
+      replace_na(list(n=0))%>%
+      vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
+    
+    system(str_c("aws s3 cp ",
+                 file.path("data", "out", str_replace(f, "vpds", "gamready")),
+                 file.path("s3://earthlab-amahood","night_fires","gamready",
+                           str_replace(f, "vpds", "gamready"))))
+  }}}}
