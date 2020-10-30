@@ -133,7 +133,7 @@ dir.create("data/out")
 
 for(f in vpd_files){
   if(file.exists(file.path("data", "goes_counts", f))){
-  
+  print(f)
   vroom(file.path("data", "vpd_lc",f))%>%
     mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
     dplyr::select(nid, VPD_hPa, rounded_datetime)%>%
