@@ -128,11 +128,11 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_coun
 
 vpd_files <- list.files("data/vpd_lc", pattern=".csv")
 goes_files <- list.files("data/goes_counts", pattern = ".csv")
-length(vpd_files) == length(goes_files)
+# length(vpd_files) == length(goes_files)
 dir.create("data/out")
 
 for(f in vpd_files){
-  if(file.exists(file.path("data", "goes_counts", f))){
+  if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
   print(f)
   vroom(file.path("data", "vpd_lc",f))%>%
     mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
@@ -147,4 +147,4 @@ for(f in vpd_files){
                file.path("data", "out", str_replace(f, "vpds", "gamready")),
                file.path("s3://earthlab-amahood","night_fires","gamready",
                          str_replace(f, "vpds", "gamready"))))
-}}
+  }}
