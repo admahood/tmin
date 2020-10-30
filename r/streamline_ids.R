@@ -1,5 +1,5 @@
 # streamline ids for NA and SA
-library(tidyverse) ; library(sf); library(vroom)
+library(tidyverse) ; library(sf); library(vroom); library(lubridate)
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/fired_polys data")
 
@@ -121,4 +121,30 @@ for(f in fired_files){
   }
 }
 
+# grand finale - joining vpd and goes counts ===================================
 
+system("aws s3 sync s3://earthlab-amahood/night_fires/vpd_lc data/vpd_lc")
+system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_counts")
+
+vpd_files <- list.files("data/vpd_lc", pattern=".csv")
+goes_files <- list.files("data/goes_counts", pattern = ".csv")
+length(vpd_files) == length(goes_files)
+dir.create("data/out")
+
+for(f in vpd_files){
+  if(file.exists(file.path("data", "goes_counts", f))){
+  
+  vroom(file.path("data", "vpd_lc",f))%>%
+    mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
+    dplyr::select(nid, VPD_hPa, rounded_datetime)%>%
+    left_join(vroom(file.path("data", "goes_counts",str_replace(f, "_vpds", ""))) %>%
+                dplyr::filter(nid %in% .$nid)
+              , by = c("nid", "rounded_datetime")) %>%
+    replace_na(list(n=0))%>%
+    vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
+  
+  system(str_c("aws s3 cp ",
+               file.path("data", "out", str_replace(f, "vpds", "gamready")),
+               file.path("s3://earthlab-amahood","night_fires","gamready",
+                         str_replace(f, "vpds", "gamready"))))
+}}
