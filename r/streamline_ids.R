@@ -122,17 +122,16 @@ for(f in fired_files){
 }
 
 # grand finale - joining vpd and goes counts ===================================
-
+dir.create("data/out")
 system("aws s3 sync s3://earthlab-amahood/night_fires/vpd_lc data/vpd_lc")
 system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_counts")
 system(str_c("aws s3 sync ",
-             file.path("s3://earthlab-amahood","night_fires","gamready")),
-             file.path("data", "out"))
+             file.path("s3://earthlab-amahood","night_fires","gamready")," ",
+             file.path("data", "out")))
 
 vpd_files <- list.files("data/vpd_lc", pattern=".csv")
 goes_files <- list.files("data/goes_counts", pattern = ".csv")
 # length(vpd_files) == length(goes_files)
-dir.create("data/out")
 
 for(f in vpd_files){
   if(!file.exists(file.path("data", "out", str_replace(f, "vpds", "gamready")))){
@@ -155,7 +154,7 @@ for(f in vpd_files){
       vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
     
     system(str_c("aws s3 cp ",
-                 file.path("data", "out", str_replace(f, "vpds", "gamready")),
+                 file.path("data", "out", str_replace(f, "vpds", "gamready")), " ",
                  file.path("s3://earthlab-amahood","night_fires","gamready",
                            str_replace(f, "vpds", "gamready"))))
   }}}}
