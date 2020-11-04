@@ -147,9 +147,10 @@ for(f in vpd_files){
   
   if(nrow(goes)>0){
     goes %>%
-      left_join(vpds %>%
-                  dplyr::filter(nid %in% vpds$nid)
-                , by = c("nid", "rounded_datetime")) %>%
+      left_join(x=vpds %>%
+                  dplyr::filter(nid %in% vpds$nid),
+                y=.,
+                by = c("nid", "rounded_datetime")) %>%
       replace_na(list(n=0))%>%
       vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
     
