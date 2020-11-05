@@ -16,61 +16,20 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/gamready")
 system("aws s3 cp s3://earthlab-amahood/night_fires/lut_ba.Rda data/lut_ba.Rda")
 system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
 
-# fired <- st_read("data/fired/events_w_attributes.gpkg") %>%
-#   st_transform(4326)
-# 
-# fire_events <- fired %>%
-#   filter(ignition_date > as.Date('2014-01-07')) %>%
-#   mutate(duration = last_date - ignition_date)
-# 
-# fire_areas <- fire_events %>%
-#   as.data.frame %>%
-#   select(-geom) %>%
-#   distinct(id, total_area_km2, lc_name, lc) %>%
-#   as_tibble
-# 
-# fire_tz <- fired %>%
-#   st_transform(crs = 4326) %>%
-#   st_centroid() %>%
-#   tz_lookup(method = 'accurate') %>%
-#   tibble %>%
-#   mutate(id = fired$id) %>%
-#   rename(timezone = ".")
-# 
-# # system("aws s3 cp s3://earthlab-mbjoseph/goes-survival/out/goes-af-era5.csv out/goes-af-era5.csv")
-# 
-# d <- vroom('out/goes-af-era5.csv') %>%
-#   left_join(fire_areas) %>%
-#   left_join(fire_tz)
-# 
-# event_summaries <- d %>%
-#   filter(n > 0) %>%
-#   group_by(id, total_area_km2) %>%
-#   summarize(n_days = length(unique(day_of_year)), 
-#             total_n = sum(n)) %>%
-#   arrange(total_n)
 
 gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv$")
 load("data/lut_ba.Rda")
-
-
 lut_ba <- drop_units(lut_ba)
+
 hourdf<- vroom("data/s_effort.csv") %>%
   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
   dplyr::rename(n_scenes=n)
 
-# lut_n<-hourdf$rounded_hour
-# names(lut_n)<-hourdf$n
-# lut_ba
-for(f in gamready_files){}
-# subset data to include time of first detection to first terminal zero
+
+for(f in gamready_files){
 
 out_fn_base <- str_replace(f, "data/gamready/","") %>%
   str_replace("_gamready.csv","")
-
-# d<- vroom(f) %>%
-#   mutate(rounded_hour = str_replace_all(str_sub(rounded_datetime, 1,13), "-", "") %>%
-#            str_replace_all(" ", "")%>% as.numeric)
 
 events <- vroom(f) %>%
   mutate(nid = factor(as.character(nid))) %>%
@@ -85,37 +44,7 @@ events <- vroom(f) %>%
   left_join(hourdf, by="rounded_datetime") %>%
   mutate(effort = log(ba) * n_scenes)
 
-# write_csv(events, "out/events.csv")
 
-# length(unique(events$id))
-# nrow(events)
-# 
-# events %>%
-#   group_by(lc_name) %>%
-#   summarize(n_events = length(unique(fid))) %>%
-#   arrange(n_events)
-
-
-
-# HGAM fitting
-# split_events <- events #%>%
-  #split(.$lc_name)
-
-# lc_counts <- events %>%
-#   group_by(lc_name) %>%
-#   distinct(id) %>%
-#   ungroup %>%
-#   count(lc_name)%>%
-#   arrange(n) %>%
-#   filter(n >= 15)
-# 
-# events %>%
-#   filter(lc_name %in% lc_counts$lc_name) %>%
-#   nrow
-
-# for (i in seq_along(split_events)) {
-#   print(i)
-#   df <- split_events[[i]] 
   if (nrow(events) == 0) next
   outname <- paste0("data/mods/",out_fn_base, 
                     "-gam.rds")
@@ -131,9 +60,10 @@ events <- vroom(f) %>%
            discrete = TRUE,
            drop.unused.levels = FALSE)
   write_rds(m, outname)
-# }
 
+}
 
+# gotta fix everything below here:
 # For each land cover type, simulate from the predictive distribution
 cover_types <- str_replace_all(gamready_files, "data/gamready/","") %>%
   str_replace("_gamready.csv","")
