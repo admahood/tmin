@@ -61,13 +61,12 @@ events <- vroom(f) %>%
   left_join(hourdf, by="rounded_datetime") %>%
   mutate(effort = log(ba) * n_scenes) %>%
   na.omit() %>%
-  filter(VPD_hPa < 30) # there were some vpds of 70000 or so that were messing up the model... most dont go above 20
-
+  filter(VPD_hPa < 30) %>% # there were some vpds of 70000 or so that were messing up the model... most dont go above 20
+  droplevels()
 
   if (nrow(events) == 0) next
-  
-  events <- droplevels(events)
   if (length(unique(events$nid)) < 15) next
+
   levels(events$nid) <- c(levels(events$nid), "NewFire")
   m <- bam(n  ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
            data = events, 
