@@ -17,17 +17,24 @@ system("aws s3 cp s3://earthlab-amahood/night_fires/lut_ba.Rda data/lut_ba.Rda")
 system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
 
 
-gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv$")
+gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv$") %>%
+  file.info() %>%
+  as_tibble(rownames = "file") %>%
+  arrange(size)
 load("data/lut_ba.Rda")
 lut_ba <- drop_units(lut_ba)
 
 hourdf<- vroom("data/s_effort.csv") %>%
   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
   dplyr::rename(n_scenes=n)
+dir.create("data/gam_progress")
+# build models
 
+for(i in 1:nrow(gamready_files)){
 
-for(f in gamready_files){
+t0<- Sys.time()  
 
+f<- gamready_files[i, "file"] %>% pull
 out_fn_base <- str_replace(f, "data/gamready/","") %>%
   str_replace("_gamready.csv","")
 
@@ -60,7 +67,18 @@ events <- vroom(f) %>%
            discrete = TRUE,
            drop.unused.levels = FALSE)
   write_rds(m, outname)
-
+  
+  t1 <- Sys.time() - t0
+  
+  blank_fn <- paste(out_fn_base,
+                    round(t1), units(t1), 
+        length(unique(events$nid)), "events", ".csv", sep="_")
+  
+  data.frame(x=NA) %>%
+    write_csv(file.path("data","gam_progress",blank_fn))
+  system(paste("aws s3 cp", 
+                file.path("data", "gam_progress", blank_fn),
+                file.path("s3://earthlab-amahood", "night_fires", "gam_progress", blank_fn)))
 }
 
 # gotta fix everything below here:
