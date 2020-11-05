@@ -6,6 +6,7 @@ library(parallel)
 library(lubridate)
 library(pbapply)
 library(lutz)
+library(units)
 library(Matrix)
 
 theme_set(theme_minimal() + 
@@ -49,95 +50,98 @@ system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv da
 #             total_n = sum(n)) %>%
 #   arrange(total_n)
 
-gamready_files <- list.files("data/gamready", full.names = TRUE)
+gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv$")
 load("data/lut_ba.Rda")
-hourdf<- vroom("data/s_effort.csv")
 
-lut_n<-hourdf$n
-names(lut_n)<-hourdf$rounded_hour %>% ymd_hm()
 
+lut_ba <- drop_units(lut_ba)
+hourdf<- vroom("data/s_effort.csv") %>%
+  mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
+  dplyr::rename(n_scenes=n)
+
+# lut_n<-hourdf$rounded_hour
+# names(lut_n)<-hourdf$n
+# lut_ba
 for(f in gamready_files){}
 # subset data to include time of first detection to first terminal zero
 
 out_fn_base <- str_replace(f, "data/gamready/","") %>%
   str_replace("_gamready.csv","")
 
-d<- vroom(f) %>%
-  mutate(ba = lut_ba[nid],
-         effort = lut_n[as.character(rounded_datetime)]);d
+# d<- vroom(f) %>%
+#   mutate(rounded_hour = str_replace_all(str_sub(rounded_datetime, 1,13), "-", "") %>%
+#            str_replace_all(" ", "")%>% as.numeric)
 
-events <- d %>%
+events <- vroom(f) %>%
   mutate(nid = factor(as.character(nid))) %>%
   group_by(nid) %>%
   mutate(first_detection = min(rounded_datetime[n > 0]), 
          hour_after_last_detection = max(rounded_datetime[n > 0]) + 60*60) %>%
   filter(rounded_datetime >= first_detection, 
          rounded_datetime <= hour_after_last_detection) %>%
-  ungroup
+  ungroup %>%
+  dplyr::select(-hour_after_last_detection, first_detection) %>%
+  mutate(ba = lut_ba[nid]) %>%
+  left_join(hourdf, by="rounded_datetime") %>%
+  mutate(effort = log(ba) * n_scenes)
 
-write_csv(events, "out/events.csv")
+# write_csv(events, "out/events.csv")
 
-length(unique(events$id))
-nrow(events)
-
-events %>%
-  group_by(lc_name) %>%
-  summarize(n_events = length(unique(fid))) %>%
-  arrange(n_events)
+# length(unique(events$id))
+# nrow(events)
+# 
+# events %>%
+#   group_by(lc_name) %>%
+#   summarize(n_events = length(unique(fid))) %>%
+#   arrange(n_events)
 
 
 
 # HGAM fitting
-split_events <- events %>%
-  split(.$lc_name)
+# split_events <- events #%>%
+  #split(.$lc_name)
 
-lc_counts <- events %>%
-  group_by(lc_name) %>%
-  distinct(id) %>%
-  ungroup %>%
-  count(lc_name)%>%
-  arrange(n) %>%
-  filter(n >= 15)
+# lc_counts <- events %>%
+#   group_by(lc_name) %>%
+#   distinct(id) %>%
+#   ungroup %>%
+#   count(lc_name)%>%
+#   arrange(n) %>%
+#   filter(n >= 15)
+# 
+# events %>%
+#   filter(lc_name %in% lc_counts$lc_name) %>%
+#   nrow
 
-events %>%
-  filter(lc_name %in% lc_counts$lc_name) %>%
-  nrow
-
-
-for (i in seq_along(split_events)) {
-  print(i)
-  df <- split_events[[i]] 
-  if (nrow(df) == 0) next
-  outname <- paste0(unique(df$lc_name) %>%
-                      tolower %>%
-                      gsub(" ", "_", .) %>%
-                      gsub("/", "-", .), 
+# for (i in seq_along(split_events)) {
+#   print(i)
+#   df <- split_events[[i]] 
+  if (nrow(events) == 0) next
+  outname <- paste0("data/mods/",out_fn_base, 
                     "-gam.rds")
   if (file.exists(outname)) next
-  df <- droplevels(df)
-  if (length(unique(df$fid)) < 15) next
-  levels(df$fid) <- c(levels(df$fid), "NewFire")
-  m <- bam(n  ~ s(vpd_kPa) + s(vpd_kPa, fid, bs = "fs"), 
-           data = df, 
+  events <- droplevels(events)
+  if (length(unique(events$nid)) < 15) next
+  levels(events$nid) <- c(levels(events$nid), "NewFire")
+  m <- bam(n  ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
+           data = events, 
            nthreads = parallel::detectCores(), 
-           offset = log(total_area_km2), 
+           offset = effort, 
            family = nb(), 
            discrete = TRUE,
            drop.unused.levels = FALSE)
   write_rds(m, outname)
-}
+# }
 
 
 # For each land cover type, simulate from the predictive distribution
-cover_types <- unique(events$lc_name)
+cover_types <- str_replace_all(gamready_files, "data/gamready/","") %>%
+  str_replace("_gamready.csv","")
 
 predictive_sim <- function(cover_type) {
-  subd <- events %>%
-    filter(lc_name == cover_type)
-  model_path <- paste0(unique(subd$lc_name) %>%
-                         tolower %>%
-                         gsub(" ", "_", .) %>%
-                         gsub("/", "-", .), 
+  
+  # subd <- vroom(str_c("data/gamready/",cover_type))
+  model_path <- paste0(out_fn_base, 
                        "-gam.rds")
   if (!file.exists(model_path)) {
     return(NA)
