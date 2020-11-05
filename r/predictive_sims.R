@@ -74,8 +74,8 @@ predictive_sim <- function(cover_type) {
   write_rds(model_summary, gsub("-gam", "-gam-summary", model_path))
   subd %>%
     mutate(n_pred = fitted(m)) %>%
-    distinct(VPD_hPa, n_pred, ba, nid) %>%
-    ggplot(aes(VPD_hPa, n_pred / ba, group = nid)) + 
+    distinct(VPD_hPa, n_pred, effort, nid) %>%
+    ggplot(aes(VPD_hPa, n_pred / effort, group = nid)) + 
     geom_path(alpha = .05) +
     scale_y_log10() 
   
@@ -110,7 +110,8 @@ predictive_sim <- function(cover_type) {
   }
   close(pb)
   
-  posterior_predictions <- dfs %>%
+  # this can take a lot of ram - subsetting to 100 takes > 100gb
+  posterior_predictions <- dfs[1:10] %>%
     bind_rows %>%
     left_join(pred_df) %>%
     arrange(j, VPD_hPa)  %>%
