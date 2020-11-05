@@ -13,6 +13,8 @@ theme_set(theme_minimal() +
             theme(panel.grid.minor = element_blank()))
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/gamready")
+system("aws s3 sync s3://earthlab-amahood/night_fires/gam_progress data/gam_progress")
+
 system("aws s3 cp s3://earthlab-amahood/night_fires/lut_ba.Rda data/lut_ba.Rda")
 system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
 
