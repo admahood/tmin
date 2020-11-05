@@ -38,8 +38,15 @@ for(i in 1:nrow(gamready_files)){
 t0<- Sys.time()  
 
 f<- gamready_files[i, "file"] %>% pull
+
 out_fn_base <- str_replace(f, "data/gamready/","") %>%
   str_replace("_gamready.csv","")
+
+outname <- paste0("data/mods/",out_fn_base, 
+                  "-gam.rds")
+if (file.exists(outname)) next
+
+print(out_fn_base)
 
 events <- vroom(f) %>%
   mutate(nid = factor(as.character(nid))) %>%
@@ -58,15 +65,13 @@ events <- vroom(f) %>%
 
 
   if (nrow(events) == 0) next
-  outname <- paste0("data/mods/",out_fn_base, 
-                    "-gam.rds")
-  if (file.exists(outname)) next
+  
   events <- droplevels(events)
   if (length(unique(events$nid)) < 15) next
   levels(events$nid) <- c(levels(events$nid), "NewFire")
   m <- bam(n  ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
            data = events, 
-           nthreads = parallel::detectCores(), 
+           nthreads = parallel::detectCores()-1, 
            offset = effort, 
            family = nb(), 
            discrete = TRUE,
