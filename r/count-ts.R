@@ -53,7 +53,8 @@ events <- vroom(f) %>%
   mutate(ba = lut_ba[nid]) %>%
   left_join(hourdf, by="rounded_datetime") %>%
   mutate(effort = log(ba) * n_scenes) %>%
-  na.omit()
+  na.omit() %>%
+  filter(VPD_hPa < 30) # there were some vpds of 70000 or so that were messing up the model... most dont go above 20
 
 
   if (nrow(events) == 0) next
@@ -78,7 +79,7 @@ events <- vroom(f) %>%
                     round(t1), units(t1), 
         length(unique(events$nid)), "events", ".csv", sep="_")
   
-  data.frame(x=NA) %>%
+  data.frame(x=1) %>%
     write_csv(file.path("data","gam_progress",blank_fn))
   system(paste("aws s3 cp", 
                 file.path("data", "gam_progress", blank_fn),
