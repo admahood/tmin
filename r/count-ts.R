@@ -30,6 +30,7 @@ hourdf<- vroom("data/s_effort.csv") %>%
   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
   dplyr::rename(n_scenes=n)
 dir.create("data/gam_progress")
+dir.create("data/mods")
 # build models
 
 for(i in 1:nrow(gamready_files)){
@@ -81,6 +82,9 @@ events <- vroom(f) %>%
   system(paste("aws s3 cp", 
                 file.path("data", "gam_progress", blank_fn),
                 file.path("s3://earthlab-amahood", "night_fires", "gam_progress", blank_fn)))
+  system(paste("aws s3 cp", 
+               file.path("data", "mods", paste0(out_fn_base, "-gam.rds")),
+               file.path("s3://earthlab-amahood", "night_fires", "gam_mods", paste0(out_fn_base, "-gam.rds"))))
 }
 
 # gotta fix everything below here:
