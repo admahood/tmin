@@ -52,7 +52,8 @@ events <- vroom(f) %>%
   dplyr::select(-hour_after_last_detection, first_detection) %>%
   mutate(ba = lut_ba[nid]) %>%
   left_join(hourdf, by="rounded_datetime") %>%
-  mutate(effort = log(ba) * n_scenes)
+  mutate(effort = log(ba) * n_scenes) %>%
+  na.omit()
 
 
   if (nrow(events) == 0) next
