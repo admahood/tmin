@@ -1,5 +1,5 @@
 # streamline ids for NA and SA
-library(tidyverse) ; library(sf); library(vroom); library(lubridate)
+library(tidyverse) ; library(sf); library(vroom); library(lubridate); library(data.table)
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/fired_polys data")
 
@@ -96,33 +96,44 @@ for(f in fired_files){
     str_replace_all("/", "") %>%
     str_replace("data", "")
   if(!file.exists(file.path("data","vpd_lc",out_fn))){
-  firez<- st_read(f)
-  
-  lut_dates <- firez$first_date_7
-  names(lut_dates) <- firez$nid
-  
-  ids <- firez %>%
-    pull(nid)
-  
-  
-  
- 
-  subsettt <- filter(wh, nid %in% ids) %>%
-    separate(hour, into = c("day", "hour"), sep="_", convert=TRUE) %>%
-    mutate(first_date = as.Date(lut_dates[as.character(nid)]),
-           date = first_date + day)
-  
-  vroom_write(subsettt, file.path("data", "vpd_lc", out_fn))
-  system(paste("aws s3 cp",
-               file.path("data", "vpd_lc", out_fn),
-               file.path("s3://earthlab-amahood", "night_fires","vpd_lc",out_fn)))
-  
-  rm(subsettt); rm(firez);gc()
+    firez<- st_read(f)
+    
+    lut_dates <- firez$first_date_7
+    names(lut_dates) <- firez$nid
+    
+    ids <- firez %>%
+      pull(nid)
+    
+    
+    
+    
+    subsettt <- filter(wh, nid %in% ids) %>%
+      separate(hour, into = c("day", "hour"), sep="_", convert=TRUE) %>%
+      mutate(first_date = as.Date(lut_dates[as.character(nid)]),
+             date = first_date + day)
+    
+    vroom_write(subsettt, file.path("data", "vpd_lc", out_fn))
+    system(paste("aws s3 cp",
+                 file.path("data", "vpd_lc", out_fn),
+                 file.path("s3://earthlab-amahood", "night_fires","vpd_lc",out_fn)))
+    
+    rm(subsettt); rm(firez);gc()
   }
 }
 
 # grand finale - joining vpd and goes counts ===================================
-dir.create("data/out")
+dir.create("data/out", recursive = TRUE, showWarnings = FALSE)
+
+# # test using Arid Deciduous Broadleaf (~24 events)
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/vpd_lc/Arid_Deciduous_Broadleaf_Forests_vpds.csv data/vpd_lc/Arid_Deciduous_Broadleaf_Forests_vpds.csv")
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/goes_counts/Arid_Deciduous_Broadleaf_Forests.csv data/goes_counts/Arid_Deciduous_Broadleaf_Forests.csv")
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/gamready/Arid_Deciduous_Broadleaf_Forests_gamready.csv data/out/Arid_Deciduous_Broadleaf_Forests_gamready.csv")
+# 
+# # bigger test using Boreal_Evergreen_Needleleaf_Forests (~176 events)
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/vpd_lc/Boreal_Evergreen_Needleleaf_Forests_vpds.csv data/vpd_lc/Boreal_Evergreen_Needleleaf_Forests_vpds.csv")
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/goes_counts/Boreal_Evergreen_Needleleaf_Forests.csv data/goes_counts/Boreal_Evergreen_Needleleaf_Forests.csv")
+# system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/gamready/Boreal_Evergreen_Needleleaf_Forests_gamready.csv data/out/Boreal_Evergreen_Needleleaf_Forests_gamready.csv")
+
 system("aws s3 sync s3://earthlab-amahood/night_fires/vpd_lc data/vpd_lc")
 system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_counts")
 system(str_c("aws s3 sync ",
@@ -135,26 +146,44 @@ goes_files <- list.files("data/goes_counts", pattern = ".csv")
 
 for(f in vpd_files){
   if(!file.exists(file.path("data", "out", str_replace(f, "vpds", "gamready")))){
-  if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
-  print(f)
-  gc()
-  vpds <- vroom(file.path("data", "vpd_lc",f))%>%
-    mutate(rounded_datetime = ymd_h(paste(date,hour)))%>%
-    dplyr::select(nid, VPD_hPa, rounded_datetime)
-  
-  goes <- vroom(file.path("data", "goes_counts",str_replace(f, "_vpds", "")))
-  
-  if(nrow(goes)>0){
-    goes %>%
-      left_join(x=vpds %>%
-                  dplyr::filter(nid %in% vpds$nid),
-                y=.,
-                by = c("nid", "rounded_datetime")) %>%
-      replace_na(list(n=0))%>%
-      vroom_write(file.path("data", "out", str_replace(f, "vpds", "gamready")))
-    
-    system(str_c("aws s3 cp ",
-                 file.path("data", "out", str_replace(f, "vpds", "gamready")), " ",
-                 file.path("s3://earthlab-amahood","night_fires","gamready",
-                           str_replace(f, "vpds", "gamready"))))
-  }}}}
+    if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
+      print(f)
+      gc()
+      
+      # read GOES data first, because we only need VPD data for rows of VPD data frame
+      # that are part of a FIRED event that has GOES detections
+      goes <- data.table::fread(file.path("data", "goes_counts", str_replace(f, "_vpds", "")), key = c("nid", "rounded_datetime"))
+      
+      # Read VPD data and set the key
+      vpds <- data.table::fread(file.path("data", "vpd_lc",f), key = c("nid"))
+      
+      # Subset VPD dataframe to just rows where there are GOES detections associated
+      # with the FIRED event; this should speed up the creation of the rounded_datetime
+      # column and might speed up the table join
+      vpds <- vpds[.(unique(goes$nid)), nomatch = NULL]
+      vpds[, `:=`(rounded_datetime = lubridate::ymd_h(paste(date, hour)),
+                  fireID = NULL,
+                  day = NULL,
+                  hour = NULL,
+                  first_date = NULL,
+                  date = NULL)]
+      
+      # Set another key that is the rounded datetime for joining to GOES data
+      data.table::setkey(vpds, nid, rounded_datetime)
+      
+      if(nrow(goes) > 0){
+        
+        # left join the VPD dataframe with the GOES dataframe, then (using 
+        # data.table chaining), assign all the GOES counts (column 'n') to 0 when
+        # the VPD values for that 'nid' and 'rounded_datetime' don't have 
+        # GOES detections
+        vpds_goes <- goes[vpds][is.na(n), n := 0]
+        
+        # Write to disk
+        data.table::fwrite(vpds_goes, file = file.path("data", "out", str_replace(f, "vpds", "gamready")))
+        
+        system(str_c("aws s3 cp ",
+                     file.path("data", "out", str_replace(f, "vpds", "gamready")), " ",
+                     file.path("s3://earthlab-amahood","night_fires","gamready",
+                               str_replace(f, "vpds", "gamready"))))
+      }}}}
