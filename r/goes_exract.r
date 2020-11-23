@@ -32,12 +32,9 @@ effort <- vroom("data/segoes.csv")%>%
   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
   dplyr::select(n_scenes=n, rounded_datetime)
 
-# loading lookup tables
-load("data/luts.Rda")
-
 # extracting the detection counts to each fire perimeter in a nested for loop 
 # (the interior loop is parallel)
-registerDoParallel( detectCores()-1 )
+
 
 for(i in 1:length(fired_files)){
   
@@ -48,6 +45,8 @@ for(i in 1:length(fired_files)){
     str_replace(".gpkg", ".csv") %>%
     str_replace("data/fired/", "")
   
+  corz<- detectCores()-1
+  registerDoParallel(corz)
   fc<-foreach(f = 1:nrow(fired), .combine= bind_rows)%dopar%{
     # fc<-foreach(f = 1:150, .combine= bind_rows)%dopar%{
       
