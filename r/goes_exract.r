@@ -13,9 +13,7 @@ system("aws s3 sync s3://earthlab-mkoontz/goes16 data/goes16 --only-show-errors"
 # fired polygons
 system("aws s3 sync s3://earthlab-amahood/night_fires/lc_splits data/fired --only-show-errors")
 
-# lookup tables for streamlined ID numbers
-system("aws s3 cp s3://earthlab-amahood/night_fires/luts.Rda data/luts.Rda")
-
+# effort (number of goes scenes per hour)
 system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/segoes.csv")
 
 
@@ -63,7 +61,8 @@ for(i in 1:length(fired_files)){
     if(length(goes)>0){
       tbl <- goes %>% 
         map_df(~read_csv(., col_types = c("TTdddddddddd")))%>%
-        dplyr::select(rounded_datetime, Mask, sinu_x, sinu_y, exactish_time = scan_center,
+        dplyr::select(rounded_datetime, Mask, sinu_x, sinu_y, 
+                      exact_time = scan_center,
                       goes_cellindex=cellindex) %>%
         na.omit()%>%
         st_as_sf(coords=c("sinu_x", "sinu_y"), crs=fired_crs)
@@ -77,13 +76,10 @@ for(i in 1:length(fired_files)){
         system(paste("echo", f, round(f/nrow(fired)*100,2), "%", out_file))
         fire_counts <- ints %>%
           st_set_geometry(NULL) %>%
-          group_by(rounded_datetime, exactish_time) %>%
+          group_by(rounded_datetime, exact_time) %>%
           dplyr::summarise(n=n()) %>%
           mutate(nid = fired[f,]$nid)%>%
           ungroup() %>%
-          # group_by(rounded_datetime) %>%
-          # dplyr::summarise(binomial=sum(n)) %>%
-          # ungroup() %>%
           left_join(effort)
         return(fire_counts)
         
