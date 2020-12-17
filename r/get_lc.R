@@ -13,8 +13,8 @@ gldas <- raster("data/gldas.nc4")
 
 # koppen climate classes:
 # http://koeppen-geiger.vu-wien.ac.at/shifts.htm
-download.file("http://koeppen-geiger.vu-wien.ac.at/data/1976-2000_GIS.zip",
-              "data/koppen.zip")
+# download.file("http://koeppen-geiger.vu-wien.ac.at/data/1976-2000_GIS.zip",
+#               "data/koppen.zip")
 
 download.file("https://ndownloader.figshare.com/files/12407516",
               "data/koppen.zip")
