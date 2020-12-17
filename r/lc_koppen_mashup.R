@@ -5,7 +5,7 @@
 # data
 
 # setup =============
-libs <- c("tidyverse", "raster", "ncdf4", "exactextractr", "stars")
+libs <- c("tidyverse", "raster", "ncdf4", "stars")
 sapply(libs, library, character.only=T)
 
 # get landcover
@@ -44,20 +44,27 @@ system(paste("aws s3 cp",
 template <-raster("data/test1.nc") %>%
   st_as_stars()
 
-# if(!exists("kop")){
-lc <- read_stars(file.path(lc_path_local, fn)) %>%
-  st_warp(dest = template)
+if(!file.exists("data/lc.Rda")){
+  lc <- read_stars(file.path(lc_path_local, fn)) %>%
+    st_warp(dest = template, use_gdal=TRUE,
+            method = "mode")
+  save(lc, file="data/lc.Rda")
+}else{load("data/lc.Rda")}
 
-kop <- raster('data/koppen/Beck_KG_V1_present_0p0083.tif') 
-# reclassifying the kop the old-fashioned way
-kop[kop<4] <- 1
-kop[kop>3 & kop<8] <- 2
-kop[kop>7 & kop<17] <- 3
-kop[kop>16 & kop < 29] <- 4
-kop[kop > 28] <- 5
-# take a while so we'll save it
-# save(lc,kop, file="data/lc_kop.Rda")
-# }else{load("data/lc_kop.Rda")}
+if(!file.exists("data/kop.Rda")){
+  kop <- raster('data/koppen/Beck_KG_V1_present_0p0083.tif')  
+  # reclassifying the kop the old-fashioned way
+  kop[kop<4] <- 1
+  kop[kop>3 & kop<8] <- 2
+  kop[kop>7 & kop<17] <- 3
+  kop[kop>16 & kop < 29] <- 4
+  kop[kop > 28] <- 5
+  
+  kop <- kop %>%
+    st_warp(dest = template, use_gdal=TRUE,
+            method = "mode")
+  save(kop, file="data/kop.Rda")
+}else{load("data/kop.Rda")}
 
 
 # # SANITY CHECK
