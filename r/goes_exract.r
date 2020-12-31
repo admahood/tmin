@@ -28,9 +28,8 @@ goes_files<- list.files("data/goes16", pattern = ".csv", full.names = TRUE) %>%
 fired_files <- list.files("data/fired", pattern = ".gpkg", full.names = TRUE)
 dir.create("data/out")
 
-effort <- vroom("data/segoes.csv")%>%
-  mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
-  dplyr::select(n_scenes=n, rounded_datetime)
+effort <- vroom("data/segoes.csv") %>%
+  dplyr::select(n_scenes = n_scenes_per_hour, rounded_datetime)
 
 # extracting the detection counts to each fire perimeter in a nested for loop 
 # (the interior loop is parallel)
