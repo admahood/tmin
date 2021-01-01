@@ -2,6 +2,7 @@ library(tidyverse)
 library(mgcv)
 library(vroom)
 library(sf)
+library(brms)
 library(parallel)
 library(lubridate)
 library(pbapply)
@@ -13,6 +14,27 @@ theme_set(theme_minimal() +
             theme(panel.grid.minor = element_blank()))
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready")
+
+### MJK notes: 
+# 1. we don't need to add in the sampling effort here; it is already in the gamready data
+# 2. We also don't need to trim off the rows of the data that represented leading or 
+# trailing 0's for GOES fire detections. That had to be done in the previous script 
+# prior to aggregating across unique combinations of nid/VPD_hPa (because we lose the 
+# rounded datetime info when we do that aggregation, so lose the ability to see which 0's
+# come before or after the sequence of GOES fire detections)
+# 3. We don't need to add in the total burned area for each fire event anymore, as that
+# no longer needs to be an offset in the model given the response variable that we've 
+# chosen to proceed with.
+# 4. The distribution of the response has changed from nb() to binomial(), so the syntax
+# of the model is a little different
+# 5. If the GOES-16 satellite was offline, there might have been times where there were
+# no GOES images taken at all. We filter these out in the dataframe prior to modeling using
+# filter(n_scenes != 0)
+# 6. The analysis ready data have 4 columns: nid (the unique identifier per FIRED event), 
+# VPD_hPa (the VPD), fire_scenes (the count of all GOES scenes that had at least one fire
+# detection within the nid event perimeter when the VPD was observed to be the value in the
+# VPD_hPa column), and n_scenes (the count of *all* GOES scenes for a given nid/VPD_hPa
+# combination)
 
 
 # system("aws s3 sync s3://earthlab-amahood/night_fires/gam_progress data/gam_progress")
@@ -80,6 +102,13 @@ events <-
            family = binomial(), 
            discrete = TRUE,
            drop.unused.levels = FALSE)
+  
+  # m <- brm(fire_scenes | trials(n_scenes) ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
+  #          data = events, 
+  #          chains = 4,
+  #          cores = 4,
+  #          family = binomial())
+  
   write_rds(m, outname)
   
   t1 <- Sys.time() - t0
