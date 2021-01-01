@@ -13,10 +13,10 @@ theme_set(theme_minimal() +
             theme(panel.grid.minor = element_blank()))
 
 system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/gamready")
-system("aws s3 sync s3://earthlab-amahood/night_fires/gam_progress data/gam_progress")
+# system("aws s3 sync s3://earthlab-amahood/night_fires/gam_progress data/gam_progress")
 
 system("aws s3 cp s3://earthlab-amahood/night_fires/lut_ba.Rda data/lut_ba.Rda")
-system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
+# system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
 
 
 gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv$") %>%
@@ -26,10 +26,10 @@ gamready_files <- list.files("data/gamready", full.names = TRUE, pattern = ".csv
 load("data/lut_ba.Rda")
 lut_ba <- drop_units(lut_ba)
 
-hourdf<- vroom("data/s_effort.csv") %>%
-  mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
-  dplyr::rename(n_scenes=n)
-dir.create("data/gam_progress")
+# hourdf<- vroom("data/s_effort.csv") %>%
+#   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
+#   dplyr::rename(n_scenes=n)
+# dir.create("data/gam_progress")
 dir.create("data/mods")
 # build models
 
@@ -50,18 +50,18 @@ print(out_fn_base)
 
 events <- vroom(f) %>%
   mutate(nid = factor(as.character(nid))) %>%
-  group_by(nid) %>%
-  mutate(first_detection = min(rounded_datetime[n > 0]), 
-         hour_after_last_detection = max(rounded_datetime[n > 0]) + 60*60) %>%
-  filter(rounded_datetime >= first_detection, 
-         rounded_datetime <= hour_after_last_detection) %>%
-  ungroup %>%
-  dplyr::select(-hour_after_last_detection, first_detection) %>%
+  # group_by(nid) %>%
+  # mutate(first_detection = min(rounded_datetime[n > 0]), 
+  #        hour_after_last_detection = max(rounded_datetime[n > 0]) + 60*60) %>%
+  # filter(rounded_datetime >= first_detection, 
+  #        rounded_datetime <= hour_after_last_detection) %>%
+  # ungroup %>%
+  # dplyr::select(-hour_after_last_detection, first_detection) %>%
   mutate(ba = lut_ba[nid]) %>%
-  left_join(hourdf, by="rounded_datetime") %>%
-  mutate(effort = log(ba) * n_scenes) %>%
+  # left_join(hourdf, by="rounded_datetime") %>%
+  # mutate(effort = log(ba) * n_scenes) %>%
   na.omit() %>%
-  filter(VPD_hPa < 30) %>% # there were some vpds of 70000 or so that were messing up the model... most dont go above 20
+  filter(VPD_hPa < 30) %>% # there were some vpds of 70000 or so that were messing up the model... most dont go above 20 (mjk note: this isn't quite true for all landcovers; the landcover with the most events/rows is equatorial savannas and only 65% of data are below 30; we should consider a higher cutoff; 97.6% of data are below 100 and 97.3% of data are below 60)
   droplevels()
 
   if (nrow(events) == 0) next
