@@ -3,7 +3,7 @@ library(stringr)
 library(lubridate)
 
 # joining vpd and goes counts ===================================
-dir.create("data/out", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/out/gamready", recursive = TRUE, showWarnings = FALSE)
 
 # # test using Arid Deciduous Broadleaf (~24 events)
 # system2(command = "aws", args = "s3 cp s3://earthlab-amahood/night_fires/vpd_lc/Arid_Deciduous_Broadleaf_Forests_vpds.csv data/vpd_lc/Arid_Deciduous_Broadleaf_Forests_vpds.csv")
@@ -22,13 +22,13 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/vpd_lc data/vpd_lc")
 system("aws s3 sync s3://earthlab-amahood/night_fires/goes_counts data/goes_counts")
 system(str_c("aws s3 sync ",
              file.path("s3://earthlab-amahood","night_fires","gamready")," ",
-             file.path("data", "out")))
+             file.path("data", "out", "gamready")))
 
 vpd_files <- list.files("data/vpd_lc", pattern=".csv")
 goes_files <- list.files("data/goes_counts", pattern = ".csv")
 
 for(f in vpd_files){
-  if(!file.exists(file.path("data", "out", str_replace(f, "vpds", "gamready")))){
+  if(!file.exists(file.path("data", "out", "gamready", str_replace(f, "vpds", "gamready")))){
     if(file.exists(file.path("data", "goes_counts", str_replace(f, "_vpds", "")))){
       print(f)
       gc()
@@ -65,8 +65,6 @@ for(f in vpd_files){
       # Set another key that is the rounded datetime for joining to GOES data
       data.table::setkey(vpds, nid, rounded_datetime)
       
-      # if(nrow(goes) > 0){
-      
       # left join the VPD dataframe with the GOES dataframe, then (using 
       # data.table chaining), assign all the GOES counts (column 'n') to 0 when
       # the VPD values for that 'nid' and 'rounded_datetime' don't have 
@@ -87,18 +85,19 @@ for(f in vpd_files){
       # distributions into sufficient statistics based on unique combinations of
       # nid and VPD_hPa
       
-      vpds_goes[, `:=`(first_detection = min(rounded_datetime[fire_scenes_per_hour > 0]),
-                       hour_after_last_detection = max(rounded_datetime[fire_scenes_per_hour > 0]) + 60*60),
-                by = .(nid)][rounded_datetime >= first_detection & rounded_datetime <= hour_after_last_detection]
+      vpds_goes_trimmed <-
+        vpds_goes[, `:=`(first_detection = min(rounded_datetime[fire_scenes_per_hour > 0]),
+                         hour_after_last_detection = max(rounded_datetime[fire_scenes_per_hour > 0]) + 60*60),
+                  by = .(nid)][rounded_datetime >= first_detection & rounded_datetime <= hour_after_last_detection]
       
-      data.table::setkey(vpds_goes, rounded_datetime)
+      data.table::setkey(vpds_goes_trimmed, rounded_datetime)
       
       # THIRD KEY STEP HERE for getting dataframe into analysis-ready format is to join with the sampling effort
       # dataframe (sampling_effort)
       
       sampling_effort <- data.table::fread("data/sampling-effort-goes16.csv", key = "rounded_datetime")
       
-      vpds_goes_sampling_effort <- sampling_effort[vpds_goes]
+      vpds_goes_sampling_effort <- sampling_effort[vpds_goes_trimmed]
       
       # Sometimes there were no GOES scenes in a particular hour at all. These show up as NA after
       # joining the sampling effort dataframe to the VPD dataframe (because the VPD dataframe has
@@ -116,13 +115,12 @@ for(f in vpd_files){
                                                        by = .(nid, VPD_hPa)]
       
       # Write to disk
-      data.table::fwrite(vpds_goes_gam_ready, file = file.path("data", "out", str_replace(f, "vpds", "gamready")))
+      data.table::fwrite(vpds_goes_gam_ready, file = file.path("data", "out", "gamready", str_replace(f, "vpds", "gamready")))
       
       system(str_c("aws s3 cp ",
-                   file.path("data", "out", str_replace(f, "vpds", "gamready")), " ",
+                   file.path("data", "out", "gamready", str_replace(f, "vpds", "gamready")), " ",
                    file.path("s3://earthlab-amahood","night_fires","gamready",
                              str_replace(f, "vpds", "gamready"))))
-      # }
     }
   }
 }
