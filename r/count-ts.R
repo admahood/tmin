@@ -2,13 +2,13 @@ library(tidyverse)
 library(mgcv)
 library(vroom)
 library(sf)
-library(brms)
 library(parallel)
 library(lubridate)
 library(pbapply)
-library(lutz)
 library(units)
 library(Matrix)
+
+set.seed(1234)
 
 theme_set(theme_minimal() + 
             theme(panel.grid.minor = element_blank()))
@@ -44,129 +44,72 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready
 gamready_files <- list.files("data/out/gamready", full.names = TRUE, pattern = ".csv$") %>%
   file.info() %>%
   as_tibble(rownames = "file") %>%
-  arrange(size)
-
-# load("data/lut_ba.Rda")
-# lut_ba <- drop_units(lut_ba)
-
-# hourdf<- vroom("data/s_effort.csv") %>%
-#   mutate(rounded_datetime = ymd_hm(rounded_hour)) %>%
-#   dplyr::rename(n_scenes=n)
-# dir.create("data/gam_progress")
+  arrange(-size)
 
 dir.create("data/mods")
 
 # build models
 
 for(i in 1:nrow(gamready_files)){
-
-t0<- Sys.time()  
-
-f<- gamready_files[i, "file"] %>% pull
-
-out_fn_base <- 
-  str_replace(f, "data/out/gamready/", "") %>%
-  str_replace("_gamready.csv", "")
-
-outname <- paste0("data/mods/", out_fn_base, 
-                  "-gam.rds")
-
-if (file.exists(outname)) next
-
-print(out_fn_base)
-
-events <- 
-  vroom(f) %>%
-  mutate(nid = factor(as.character(nid))) %>%
-  # group_by(nid) %>%
-  # mutate(first_detection = min(rounded_datetime[n > 0]), 
-  #        hour_after_last_detection = max(rounded_datetime[n > 0]) + 60*60) %>%
-  # filter(rounded_datetime >= first_detection, 
-  #        rounded_datetime <= hour_after_last_detection) %>%
-  # ungroup %>%
-  # dplyr::select(-hour_after_last_detection, first_detection) %>%
-  # mutate(ba = lut_ba[nid]) %>%
-  # left_join(hourdf, by="rounded_datetime") %>%
-  # mutate(effort = log(ba) * n_scenes) %>%
-  filter(n_scenes != 0) %>% # drop any VPD_hPa/nid combinations that had 0 GOES images associated with it (due to orbital maneuvering and GOES imager being offline)
-  filter(VPD_hPa < 30) %>% # there were some vpds of 70000 or so that were messing up the model... most dont go above 20 (mjk note: this isn't quite true for all landcovers; the landcover with the most events/rows is equatorial savannas and only 65% of data are below 30; we should consider a higher cutoff; 97.6% of data are below 100 and 97.3% of data are below 60. The same amount of data are below 100 as are below 1000 for this landcover type)
-  droplevels()
+  f<- gamready_files[i, "file"] %>% pull
+  
+  out_fn_base <- 
+    str_replace(f, "data/out/gamready/", "") %>%
+    str_replace("_gamready.csv", "")
+  
+  outname <- paste0("data/mods/", out_fn_base, 
+                    "-gam.rds")
+  
+  if (file.exists(outname)) next
+  
+  print(out_fn_base)
+  
+  events <- 
+    vroom(f) %>%
+    mutate(nid = factor(as.character(nid))) %>%
+    filter(n_scenes != 0) %>% # drop any VPD_hPa/nid combinations that had 0 GOES images associated with it (due to orbital maneuvering and GOES imager being offline)
+    filter(VPD_hPa < 100) %>% 
+    droplevels()
 
   if (nrow(events) == 0) next
-  if (length(unique(events$nid)) < 15) next
+  if (length(unique(events$nid)) < 200) next
+  
+  # subsample for ecoregions with lots of rows
+  max_nrow <- 10000
+  if (nrow(events) > max_nrow) {
+    print(paste("subsampling for", out_fn_base))
+    print(paste("initial nrow =", nrow(events)))
+    while (nrow(events) > max_nrow) {
+      current_nrow <- nrow(events)
+      frac_to_keep <- max_nrow / current_nrow * .9
+      events_to_keep <- sample(unique(events$nid), 
+                               size = round(frac_to_keep * 
+                                              length(unique(events$nid))), 
+                               replace = FALSE)
+      events <- filter(events, nid %in% events_to_keep) %>%
+        droplevels()
+    }
+    print(paste("final nrow =", nrow(events)))
+  }
 
   levels(events$nid) <- c(levels(events$nid), "NewFire")
-  m <- bam(cbind(fire_scenes, n_scenes - fire_scenes) ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
-           data = events, 
-           nthreads = parallel::detectCores()-1, 
-           family = binomial(), 
+  m <- bam(cbind(fire_scenes, n_scenes - fire_scenes) ~ VPD_hPa + s(nid, bs = "re"),
+           data = events,
+           nthreads = parallel::detectCores()-1,
+           family = binomial(),
            discrete = TRUE,
            drop.unused.levels = FALSE)
-  
-  # m <- brm(fire_scenes | trials(n_scenes) ~ s(VPD_hPa) + s(VPD_hPa, nid, bs = "fs"), 
-  #          data = events, 
-  #          chains = 4,
-  #          cores = 4,
-  #          family = binomial())
-  
   write_rds(m, outname)
   
-  t1 <- Sys.time() - t0
-  
-  blank_fn <- paste(out_fn_base,
-                    round(t1), units(t1), 
-        length(unique(events$nid)), "events", ".csv", sep="_")
-  
-  data.frame(x=1) %>%
-    write_csv(file.path("data","gam_progress",blank_fn))
-  system(paste("aws s3 cp", 
-                file.path("data", "gam_progress", blank_fn),
-                file.path("s3://earthlab-amahood", "night_fires", "gam_progress", blank_fn)))
-  system(paste("aws s3 cp", 
-               file.path("data", "mods", paste0(out_fn_base, "-gam.rds")),
-               file.path("s3://earthlab-amahood", "night_fires", "gam_mods", paste0(out_fn_base, "-gam.rds"))))
-}
-
-# gotta fix everything below here:
-# For each land cover type, simulate from the predictive distribution
-cover_types <- str_replace_all(gamready_files, "data/gamready/","") %>%
-  str_replace("_gamready.csv","")
-
-predictive_sim <- function(cover_type) {
-  
-  # subd <- vroom(str_c("data/gamready/",cover_type))
-  model_path <- paste0(out_fn_base, 
-                       "-gam.rds")
-  if (!file.exists(model_path)) {
-    return(NA)
-  }
-  prediction_csv_path <- gsub("-gam.rds", "-preds.csv", model_path)
-  if (file.exists(prediction_csv_path)) {
-    return(NA)
-  }
-  m <- model_path %>%
-    read_rds
+  # simulate from the posterior predictive distribution
   model_summary <- summary(m)
-  write_rds(model_summary, gsub("-gam", "-gam-summary", model_path))
-  subd %>%
-    mutate(n_pred = fitted(m)) %>%
-    distinct(vpd_kPa, n_pred, total_area_km2, fid, lc_name) %>%
-    ggplot(aes(vpd_kPa, n_pred / total_area_km2, group = fid)) + 
-    geom_path(alpha = .05) +
-    scale_y_log10() + 
-    facet_wrap(~lc_name)
+  write_rds(model_summary, gsub("-gam", "-gam-summary", outname))
   
-  # Simulate from predictive distribution
-  pred_df <- subd %>%
-    distinct(lc_name) %>%
-    mutate(total_area_km2 = events %>% 
-             distinct(fid, total_area_km2) %>% 
-             summarize(median(total_area_km2)) %>% 
-             unlist %>% 
-             c,
-           vpd_kPa = list(seq(0, max(events$vpd_kPa), by = .05)), 
-           fid = "NewFire") %>%
-    unnest(cols = c(vpd_kPa)) %>%
+  pred_df <- tibble(lc_name = out_fn_base,
+                    VPD_hPa = list(seq(0, max(events$VPD_hPa), by = 1)), 
+                    nid = "NewFire", 
+                    n_scenes = 1) %>%
+    unnest(cols = c(VPD_hPa)) %>%
     mutate(idx = 1:n())
   Xp <- predict(m, pred_df, type = "lpmatrix")
   nonzero_cols <- colSums(Xp) != 0
@@ -176,13 +119,11 @@ predictive_sim <- function(cover_type) {
   br <- MASS::mvrnorm(n, beta, Vb) 
   dfs <- list()
   pb <- txtProgressBar(max = n, style = 3)
-  stopifnot(length(unique(pred_df$total_area_km2)) == 1)
   for (j in 1:n) {
-    dfs[[j]] <- tibble(Xb = Xp[, nonzero_cols] %*% br[j, ] %>% 
+    dfs[[j]] <- tibble(logit_p = Xp[, nonzero_cols] %*% br[j, ] %>% 
                          as.vector, 
                        j = j) %>%
-      mutate(idx = 1:n(), 
-             log_mu = Xb + log(pred_df$total_area_km2[1]))
+      mutate(idx = 1:n())
     setTxtProgressBar(pb, j)
   }
   close(pb)
@@ -190,13 +131,10 @@ predictive_sim <- function(cover_type) {
   posterior_predictions <- dfs %>%
     bind_rows %>%
     left_join(pred_df) %>%
-    arrange(lc_name, j, vpd_kPa)  %>%
-    mutate(y_pred = MASS::rnegbin(n(), 
-                                  exp(log_mu), 
-                                  theta = exp(m$family$getTheta())), 
-           pr_zero = dnbinom(0, size = exp(m$family$getTheta()), mu = exp(log_mu)))
+    arrange(lc_name, j, VPD_hPa)  %>%
+    mutate(y_pred = rbinom(n(), size = 1, prob = plogis(logit_p)), 
+           pr_zero = dbinom(0, size = 1, prob = plogis(logit_p)), 
+           n_events = length(unique(events$nid)))
   posterior_predictions %>%
-    write_csv(prediction_csv_path)
+    write_csv(gsub("-gam.rds", "-gam-predictions.csv", outname))
 }
-
-sims <- pblapply(cover_types, predictive_sim)
