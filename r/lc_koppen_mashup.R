@@ -1,5 +1,5 @@
 # script to create landcover layer for use in paper. For the revised analysis,
-# we're using both the Koppen climate classificaitons and the MODIS MCDQ1
+# we're using both the Koppen climate classifications and the MODIS MCDQ1
 # landcover to generate vpd thresholds for the burnable landscape. This script
 # is going to combine those two layers for visualization and use with climate 
 # data
@@ -47,7 +47,8 @@ template <-raster("data/test1.nc") %>%
 if(!file.exists("data/lc.Rda")){
   lc <- read_stars(file.path(lc_path_local, fn)) %>%
     st_warp(dest = template, use_gdal=TRUE,
-            method = "mode")
+            method="near")#,
+            # method = "mode")
   save(lc, file="data/lc.Rda")
 }else{load("data/lc.Rda")}
 
@@ -67,6 +68,3 @@ if(!file.exists("data/kop.Rda")){
 }else{load("data/kop.Rda")}
 
 
-# # SANITY CHECK
-# freq(kop)
-# freq(lc)
