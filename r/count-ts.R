@@ -10,9 +10,6 @@ library(Matrix)
 
 set.seed(1234)
 
-theme_set(theme_minimal() + 
-            theme(panel.grid.minor = element_blank()))
-
 system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready")
 
 ### MJK notes: 
@@ -37,19 +34,14 @@ system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready
 # combination)
 
 
-# system("aws s3 sync s3://earthlab-amahood/night_fires/gam_progress data/gam_progress")
-# system("aws s3 cp s3://earthlab-amahood/night_fires/lut_ba.Rda data/lut_ba.Rda")
-# system("aws s3 cp s3://earthlab-mkoontz/goes16meta/sampling-effort-goes16.csv data/s_effort.csv")
-
 gamready_files <- list.files("data/out/gamready", full.names = TRUE, pattern = ".csv$") %>%
   file.info() %>%
   as_tibble(rownames = "file") %>%
   arrange(-size)
 
-dir.create("data/mods")
+dir.create("data/mods", showWarnings = FALSE, recursive = TRUE)
 
-# build models
-
+# Fit models for each ecoregion
 for(i in 1:nrow(gamready_files)){
   f<- gamready_files[i, "file"] %>% pull
   
@@ -75,13 +67,13 @@ for(i in 1:nrow(gamready_files)){
   if (length(unique(events$nid)) < 200) next
   
   # subsample for ecoregions with lots of rows
-  max_nrow <- 10000
+  max_nrow <- 100000
   if (nrow(events) > max_nrow) {
     print(paste("subsampling for", out_fn_base))
     print(paste("initial nrow =", nrow(events)))
     while (nrow(events) > max_nrow) {
       current_nrow <- nrow(events)
-      frac_to_keep <- max_nrow / current_nrow * .9
+      frac_to_keep <- max_nrow / current_nrow * .99
       events_to_keep <- sample(unique(events$nid), 
                                size = round(frac_to_keep * 
                                               length(unique(events$nid))), 
@@ -95,28 +87,38 @@ for(i in 1:nrow(gamready_files)){
   levels(events$nid) <- c(levels(events$nid), "NewFire")
   m <- bam(cbind(fire_scenes, n_scenes - fire_scenes) ~ VPD_hPa + s(nid, bs = "re"),
            data = events,
-           nthreads = parallel::detectCores()-1,
+           nthreads = parallel::detectCores(),
            family = binomial(),
            discrete = TRUE,
            drop.unused.levels = FALSE)
+  m2 <- bam(cbind(fire_scenes, n_scenes - fire_scenes) ~ s(VPD_hPa, k=3) + s(nid, bs = "re"),
+            data = events,
+            nthreads = parallel::detectCores(),
+            family = binomial(),
+            discrete = TRUE,
+            drop.unused.levels = FALSE)
   write_rds(m, outname)
   
   # simulate from the posterior predictive distribution
-  model_summary <- summary(m)
-  write_rds(model_summary, gsub("-gam", "-gam-summary", outname))
-  
   pred_df <- tibble(lc_name = out_fn_base,
-                    VPD_hPa = list(seq(0, max(events$VPD_hPa), by = 1)), 
+                    VPD_hPa = 0:92, 
                     nid = "NewFire", 
                     n_scenes = 1) %>%
-    unnest(cols = c(VPD_hPa)) %>%
     mutate(idx = 1:n())
+  
+  # generate approximate draws from the posterior 
+  # (assuming that we can approximate the posterior with a multivariate normal)
+  # note: treats the random effect standard deviation as "known"
+  # in other words, if our "NewFire" factor level adjustment is z, this is:
+  # z ~ Normal(0, sd_z), where sd_z is a point estimate from the model
   Xp <- predict(m, pred_df, type = "lpmatrix")
   nonzero_cols <- colSums(Xp) != 0
   beta <- coef(m)[nonzero_cols]
   Vb <- vcov(m)[nonzero_cols, nonzero_cols] ## posterior mean and cov of coefs
   n <- 1000
   br <- MASS::mvrnorm(n, beta, Vb) 
+  
+  # for each posterior draw, compute logit pr of detection
   dfs <- list()
   pb <- txtProgressBar(max = n, style = 3)
   for (j in 1:n) {
@@ -128,10 +130,13 @@ for(i in 1:nrow(gamready_files)){
   }
   close(pb)
   
+  # join all draws into big df and simulate values/compute probabilities
+  # this data frame should have (n_draws x n_vpd_values) rows
   posterior_predictions <- dfs %>%
     bind_rows %>%
     left_join(pred_df) %>%
     arrange(lc_name, j, VPD_hPa)  %>%
+    # simulating values from the approximate posterior
     mutate(y_pred = rbinom(n(), size = 1, prob = plogis(logit_p)), 
            pr_zero = dbinom(0, size = 1, prob = plogis(logit_p)), 
            n_events = length(unique(events$nid)))
