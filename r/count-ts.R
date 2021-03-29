@@ -91,12 +91,6 @@ for(i in 1:nrow(gamready_files)){
            family = binomial(),
            discrete = TRUE,
            drop.unused.levels = FALSE)
-  m2 <- bam(cbind(fire_scenes, n_scenes - fire_scenes) ~ s(VPD_hPa, k=3) + s(nid, bs = "re"),
-            data = events,
-            nthreads = parallel::detectCores(),
-            family = binomial(),
-            discrete = TRUE,
-            drop.unused.levels = FALSE)
   write_rds(m, outname)
   
   # simulate from the posterior predictive distribution
