@@ -47,8 +47,7 @@ template <-raster("data/test1.nc") %>%
 if(!file.exists("data/lc.Rda")){
   lc <- read_stars(file.path(lc_path_local, fn)) %>%
     st_warp(dest = template, use_gdal=TRUE,
-            method="near")#,
-            # method = "mode")
+            method = "near")
   save(lc, file="data/lc.Rda")
 }else{load("data/lc.Rda")}
 
@@ -63,8 +62,11 @@ if(!file.exists("data/kop.Rda")){
   
   kop <- kop %>%
     st_warp(dest = template, use_gdal=TRUE,
-            method = "mode")
+            method = "near")
   save(kop, file="data/kop.Rda")
 }else{load("data/kop.Rda")}
+system("aws s3 cp data/kop.Rda s3://earthlab-amahood/night_fires/kop.Rda")
+system("aws s3 cp data/lc.Rda s3://earthlab-amahood/night_fires/lc.Rda")
 
-
+# putting them together
+kop_lc2010 <- (kop*100) + lc
