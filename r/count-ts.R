@@ -10,7 +10,7 @@ library(Matrix)
 
 set.seed(1234)
 
-system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready")
+#system("aws s3 sync s3://earthlab-amahood/night_fires/gamready data/out/gamready")
 
 ### MJK notes: 
 # 1. we don't need to add in the sampling effort here; it is already in the gamready data
@@ -38,6 +38,16 @@ gamready_files <- list.files("data/out/gamready", full.names = TRUE, pattern = "
   file.info() %>%
   as_tibble(rownames = "file") %>%
   arrange(-size)
+
+# get the total number of events and hours to report in the manuscript
+total_summaries <- gamready_files$file %>%
+  lapply(FUN = function(f){
+    vroom::vroom(f) %>%
+           summarize(n_event = length(unique(nid)), 
+                     n_hours = sum(unique(n_scenes)))
+    }) %>%
+  bind_rows %>%
+  colSums()
 
 dir.create("data/mods", showWarnings = FALSE, recursive = TRUE)
 

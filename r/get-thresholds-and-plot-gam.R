@@ -59,7 +59,7 @@ partial_plot <- plot_df %>%
   ggplot(aes(VPD_hPa, mu, color = facet_label)) +
   geom_path(alpha = .5, aes(group = lc_name)) +
   geom_ribbon(aes(ymin = lo, ymax = hi, group = lc_name), 
-              color = NA, alpha = .05) +
+              color = NA, alpha = .02) +
   theme_minimal() + 
   theme(legend.position = "none", 
         panel.grid.minor = element_blank(), 
