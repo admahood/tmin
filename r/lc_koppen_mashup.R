@@ -54,7 +54,7 @@ system(paste("aws s3 cp",
 if(!file.exists("data/lc.Rda")){
   lc <- read_stars(file.path(lc_path_local, fn)) %>%
     st_warp(dest = template, use_gdal=TRUE,
-            method = "near")
+            method = "mode")
   save(lc, file="data/lc.Rda")
   system("aws s3 cp data/lc.Rda s3://earthlab-amahood/night_fires/lc.Rda")
 }else{load("data/lc.Rda")}
