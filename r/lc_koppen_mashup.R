@@ -44,16 +44,30 @@ system(paste("aws s3 cp",
 template <-raster("data/test1.nc") %>%
   st_as_stars()
 
+lc_path_s3 <- "s3://earthlab-amahood/night_fires/lc.Rda"
+lc_path_local <- "data/lc.Rda"
+system(paste("aws s3 cp",
+             lc_path_s3,
+             lc_path_local))
+
+
 if(!file.exists("data/lc.Rda")){
   lc <- read_stars(file.path(lc_path_local, fn)) %>%
     st_warp(dest = template, use_gdal=TRUE,
-            method="near")#,
-            # method = "mode")
+            method = "mode")
   save(lc, file="data/lc.Rda")
+  system("aws s3 cp data/lc.Rda s3://earthlab-amahood/night_fires/lc.Rda")
 }else{load("data/lc.Rda")}
 
+
+kop_path_s3 <- "s3://earthlab-amahood/night_fires/kop.Rda"
+kop_path_local <- "data/kop.Rda"
+system(paste("aws s3 cp",
+             kop_path_s3,
+             kop_path_local))
+
 if(!file.exists("data/kop.Rda")){
-  kop <- raster('data/koppen/Beck_KG_V1_present_0p0083.tif')  
+  kop <- raster('data/koppen/Beck_KG_V1_present_0p083.tif')  
   # reclassifying the kop the old-fashioned way
   kop[kop<4] <- 1
   kop[kop>3 & kop<8] <- 2
@@ -62,9 +76,27 @@ if(!file.exists("data/kop.Rda")){
   kop[kop > 28] <- 5
   
   kop <- kop %>%
+    st_as_stars %>%
     st_warp(dest = template, use_gdal=TRUE,
             method = "mode")
   save(kop, file="data/kop.Rda")
+  system("aws s3 cp data/kop.Rda s3://earthlab-amahood/night_fires/kop.Rda")
 }else{load("data/kop.Rda")}
 
 
+# putting them together
+kop_lc2010 <- (kop*100) + lc
+stars::write_stars(kop_lc2010, "lc_koppen_2010_mode.tif")
+
+
+raster::raster("lc_koppen_2010_mode.tif")->xx
+
+xx[xx==117] <- NA
+xx[xx==517] <- NA
+xx[xx==417] <- NA
+xx[xx==317] <- NA
+xx[xx==217] <- NA
+plot(xx)
+
+writeRaster(xx, "data/lc_koppen_2010_mode.tif", overwrite=TRUE)
+system("aws s3 cp data/lc_koppen_2010_mode.tif s3://earthlab-amahood/night_fires/lc_koppen_2010_mode.tif")
