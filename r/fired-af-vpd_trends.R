@@ -34,6 +34,8 @@ fired_wh <- bind_rows(fired_na, fired_sa)
 result <- list()
 counter<-1
 for(y in years){
+  outfile<-paste0("af_fired_wh_", y, ".gpkg")
+  if(!file.exists(file.path("data",outfile))){
   source <- file.path(s3_path_af, paste0(flnm_base_af, y, ".csv"))
   target <- file.path("data", "mcd14", paste0(flnm_base_af, y, ".csv"))
   if(!file.exists(target)){
@@ -63,7 +65,6 @@ for(y in years){
     mutate(kop = str_sub(lc, 1,1),
            lc_raw = str_sub(lc,2,3))
   
-  outfile<-paste0("af_fired_wh_", y, ".gpkg")
   st_write(af_joined, file.path("data", outfile),delete_dsn = TRUE)
   
   system(paste(
@@ -71,8 +72,8 @@ for(y in years){
     file.path("data",outfile),
     file.path("s3://earthlab-mkoontz", "mcd14ml_analysis-ready", "joined_with_fired",outfile)
   ))
-  
-  result[[counter]] <- af_joined
+  }
+  # result[[counter]] <- af_joined
   counter <- counter+1
 }
 
