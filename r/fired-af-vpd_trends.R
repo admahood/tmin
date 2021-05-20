@@ -166,5 +166,6 @@ tslist <- foreach(i = lcs)%dopar%{
   
 tsmod <- mblm(night_fraction ~ year, 
               repeated = TRUE, 
-              dataframe = joined %>% filter(lc == i))
+              dataframe = joined %>% filter(lc == i, n>10))
 }
+tsmod
