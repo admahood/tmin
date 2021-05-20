@@ -85,19 +85,86 @@ afwh <- do.call(bind_rows, result) %>%
 save(afna, file = "data/afna.Rda")
 
 # explore ========================
-ggplot(afna, aes(x=n)) +
+system(paste(
+  "aws s3 sync",
+  file.path("s3://earthlab-mkoontz", "mcd14ml_analysis-ready", "joined_with_fired"),
+  file.path("data", "af_fired_joined")
+))
+
+joined<- list.files(file.path("data", "af_fired_joined"), full.names = T) %>%
+  lapply(st_read) %>%
+  st_set_geometry(NULL) %>%
+  bind_rows
+
+ggplot(joined, aes(x=n)) +
   geom_histogram()+
   scale_x_log10()
 
-ggplot(afna %>% filter(n>5, year >2002, year < 2020), aes(x=as.factor(year), y=night_fraction,
+ggplot(joined %>% filter(n>10, year >2002, year < 2020), 
+       aes(x=as.factor(year), y=night_fraction,
        color = as.factor(kop))) +
   geom_boxplot() +
   facet_wrap(~kop)
 
-ggplot(afna %>% filter(n>5, year >2002, year < 2020), aes(x=year,
-                                                           y=night_detections, 
-                                                           color = as.factor(kop))) +
-  geom_smooth(method = "lm")
+ggplot(joined %>% filter(n>5, year >2002, year < 2020) %>% na.omit, 
+       aes(x=year,
+           y=night_detections, 
+           color = as.factor(lc_raw))) +
+  geom_smooth() +
+  facet_grid(lc_raw~kop, scales = "free")
+
+
+ggplot(joined %>% filter(year >2002, year < 2020) %>% na.omit, 
+       aes(x=year,
+           y=log(night_detections+1))) +
+  geom_smooth(method = "glm", 
+              method.args=list(family = "quasipoisson"))
+
+ggplot(joined %>% filter(year >2002, year < 2020) %>% na.omit, 
+       aes(x=year,
+           y=night_fraction)) +
+  geom_smooth()
+
+ggplot(joined %>% filter(n>10,year >2002, year < 2020) %>% na.omit, 
+       aes(x=year %>% as.factor,
+           y=night_fraction)) +
+  geom_boxplot(outlier.shape=NA) +
+  facet_grid(kop~lc_raw)
 
 # model - binomial glm, trials = n   ====================================
+library(effects)
+library(lme4)
+mod1<-glm(night_fraction ~ year*as.factor(lc), 
+          weights = n,
+          data = joined, family = "binomial")
+summary(mod1)
 
+plot(allEffects(mod1))
+
+
+mod2<-glm(night_fraction ~ year*as.factor(kop), 
+            weights = n,
+            data = joined, 
+            family = "binomial")
+summary(mod2)
+
+mod3<-glm(night_fraction ~ year*as.factor(lc_raw), 
+          weights = n,
+          data = joined %>% filter(kop ==3), 
+          family = "binomial")
+summary(mod3)
+
+# theil sen =======
+library(mblm)
+library(foreach)
+library(doParallel)
+
+lcs <- joined$lc %>% na.omit %>% unique
+
+registerDoParallel(cores=detectCores())
+tslist<- foreach(i = lcs)%dopar%{
+  
+tsmod <- mblm(night_fraction ~ year, 
+              repeated = TRUE, 
+              dataframe = joined %>% filter(lc == i))
+}
