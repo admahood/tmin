@@ -93,8 +93,8 @@ system(paste(
 
 joined<- list.files(file.path("data", "af_fired_joined"), full.names = T) %>%
   lapply(st_read) %>%
-  st_set_geometry(NULL) %>%
-  bind_rows
+  bind_rows %>%
+  st_set_geometry(NULL)
 
 ggplot(joined, aes(x=n)) +
   geom_histogram()+
@@ -162,7 +162,7 @@ library(doParallel)
 lcs <- joined$lc %>% na.omit %>% unique
 
 registerDoParallel(cores=detectCores())
-tslist<- foreach(i = lcs)%dopar%{
+tslist <- foreach(i = lcs)%dopar%{
   
 tsmod <- mblm(night_fraction ~ year, 
               repeated = TRUE, 
