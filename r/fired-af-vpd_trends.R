@@ -93,8 +93,8 @@ system(paste(
 
 joined<- list.files(file.path("data", "af_fired_joined"), full.names = T) %>%
   lapply(st_read) %>%
-  st_set_geometry(NULL) %>%
-  bind_rows
+  bind_rows %>%
+  st_set_geometry(NULL)
 
 ggplot(joined, aes(x=n)) +
   geom_histogram()+
@@ -159,12 +159,26 @@ library(mblm)
 library(foreach)
 library(doParallel)
 
+
+
 lcs <- joined$lc %>% na.omit %>% unique
 
-registerDoParallel(cores=detectCores())
-tslist<- foreach(i = lcs)%dopar%{
+registerDoParallel(cores=detectCores()-1)
+tslist <- foreach(i = 1:length(lcs), .combine=bind_rows)%dopar%{
+# for(i in 1:length(lcs)){
+  system(paste("echo", i))
+  d <- filter(joined, lc == lcs[i], n>10)
+  # if(nrow(d) > 100) d <- slice(d, 1:1000) # for testing
   
-tsmod <- mblm(night_fraction ~ year, 
-              repeated = TRUE, 
-              dataframe = joined %>% filter(lc == i))
+  if(nrow(d)>10){
+    tsmod <- mblm(night_fraction ~ year,
+                  repeated = TRUE,
+                  dataframe = d)
+  }
+  xx<- summary(tsmod)
+  tibble(lckop = lcs[i], 
+         intercept = tsmod$coefficients[1], 
+         slope = tsmod$coefficients[2],
+         p = xx$coefficients[2,4])
 }
+tslist
