@@ -1,22 +1,32 @@
 # modeling overpass counts
+library(devtools)
+
+# install_github("leandroroser/EcoGenetics-devel")
 
 library(sf)
 library(raster)
 library(tidyverse)
 library(lubridate)
-library(devtools)
-# install_github("leandroroser/EcoGenetics-devel")
 library(EcoGenetics)
 # file management
-op_days <- list.files("/home/a/data/fire/overpass_counts/month_2003-2020", 
+
+system(paste("aws s3 sync",
+             "s3://earthlab-mkoontz/MODIS-overpass-counts_1_analysis-ready",
+             "data/overpass_counts"))
+
+op_days <- list.files("data/overpass_counts/month_2003-2020", 
                      full.names = TRUE, pattern = "*day*") 
-op_nights <- list.files("/home/a/data/fire/overpass_counts/month_2003-2020", 
+op_nights <- list.files("data/overpass_counts/month_2003-2020", 
                      full.names = TRUE, pattern = "*night*")
 
-mod14_day_counts<- list.files("/home/a/data/fire/gridded_mod14/AFC_num", 
+system(paste("aws s3 sync",
+             "s3://earthlab-jmcglinchy/night_fire/gridded/vars_refresh_may2021/CSV_nocorn_grid_1_0_degree_vars",
+             "data/gridded_mod14"))
+
+mod14_day_counts<- list.files("data/gridded_mod14/AFC_num", 
                               full.names = TRUE,
                               pattern = "_D_") %>%
-  as_tibble %>%
+  as_tibble() %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
   filter(year > 2002)%>%
   separate(value, sep = "_", into = c("g1", "g2","g3","g4","g5","g7","month","g6"), remove = FALSE) %>%
@@ -25,7 +35,7 @@ mod14_day_counts<- list.files("/home/a/data/fire/gridded_mod14/AFC_num",
          month_n = lubridate::month(date))
   
 
-mod14_night_counts<- list.files("/home/a/data/fire/gridded_mod14/AFC_num", 
+mod14_night_counts<- list.files("data/gridded_mod14/AFC_num", 
                               full.names = TRUE,
                               pattern = "_N_") %>%
   as_tibble  %>%
@@ -37,7 +47,7 @@ mod14_night_counts<- list.files("/home/a/data/fire/gridded_mod14/AFC_num",
          month_n = lubridate::month(date)) 
 
 # do the adjusting =================
-
+dir.create("data/adjusted_counts")
 for(i in 1:nrow(mod14_day_counts)){
   print(i)
   month <- mod14_day_counts$month_n[i]
@@ -78,7 +88,7 @@ adjusted_n <- list.files("data/adjusted_counts", full.names = TRUE, pattern = "*
 adjusted_d <- list.files("data/adjusted_counts", full.names = TRUE, pattern = "*_D_*")%>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
-
+dir.create("data/annual_adjusted_counts")
 years <- 2003:2020
 for(y in years){
   print(y)
@@ -107,7 +117,9 @@ sum_day_counts <- day_counts %>% raster::calc(sum)
 
 day_counts[sum_day_counts == 0] <- NA
 
-day_trends<- eco.theilsen(day_counts, dates = 1:length(day_counts), run_parallel = TRUE)
+annual_dates <- as.Date(paste(2003:2020, "01", "01", sep = "-"))
+
+day_trends<- eco.theilsen(day_counts, dates = 2003:2020)
 
 # night counts
 night_counts <- list.files("data/annual_adjusted_counts", pattern = "night_adj*", full.names = TRUE) %>%
