@@ -117,9 +117,10 @@ sum_day_counts <- day_counts %>% raster::calc(sum)
 
 day_counts[sum_day_counts == 0] <- NA
 
-annual_dates <- as.Date(paste(2003:2020, "01", "01", sep = "-"))
-
 day_trends<- eco.theilsen(day_counts, dates = 2003:2020)
+dir.create("out")
+system("mv slope.tif out/ts_estimate_daycount_annual.tif")
+system("mv pvalue.tif out/ts_p_daycount_annual.tif")
 
 # night counts
 night_counts <- list.files("data/annual_adjusted_counts", pattern = "night_adj*", full.names = TRUE) %>%
@@ -129,7 +130,10 @@ sum_night_counts <- night_counts %>% raster::calc(sum)
 
 night_counts[sum_night_counts == 0] <- NA
 
-night_trends<- eco.theilsen(night_counts, dates = 1:length(night_counts), run_parallel = TRUE)
+night_trends<- eco.theilsen(night_counts, dates = 2003:2020)
+
+system("mv slope.tif out/ts_estimate_nightcount_annual.tif")
+system("mv pvalue.tif out/ts_p_nightcount_annual.tif")
 
 # night fraction
 night_fractions <- list.files("data/annual_adjusted_counts", pattern = "night_fraction*", full.names = TRUE) %>%
@@ -137,7 +141,50 @@ night_fractions <- list.files("data/annual_adjusted_counts", pattern = "night_fr
 
 night_fractions[sum_night_counts+sum_day_counts == 0] <- NA
 
-night_fraction_trends<- eco.theilsen(night_fractions, dates = 1:length(night_fractions), run_parallel = TRUE)
-#1320 start
+night_fraction_trends<- eco.theilsen(night_fractions, dates = 1:nlayers(night_fractions))
+
+system("mv slope.tif out/ts_estimate_nightfraction_annual.tif")
+system("mv pvalue.tif out/ts_p_nightfraction_annual.tif")
 
 # night frp
+
+
+
+plot_sig_ts <- function(nf, pv, title){
+
+  nf<- raster(nf)
+  pv<- raster(pv)
+  
+  x<-pv
+  x[pv<0.05] <- 1
+  x[pv>0.05] <- 0
+  
+  z<-nf*x
+  
+  z[z==0]<-NA
+  z[z>0]<- 1
+  z[z<0]<- -1
+  plot(z)
+  
+  z %>%
+    as.data.frame(xy=TRUE) %>%
+    ggplot()+
+    geom_raster(aes(x=x,y=y,fill=layer))+
+    scale_fill_gradient2(na.value = "transparent", low = "blue", high = "red") +
+    theme_minimal() +
+    ggtitle(title)
+}
+nf <- raster("out/ts_estimate_nightfraction_annual.tif")
+pv <- raster("out/ts_p_nightfraction_annual.tif")
+
+plot_sig_ts(nf="out/ts_estimate_nightfraction_annual.tif",
+            pv="out/ts_p_nightfraction_annual.tif",
+            title = "Night Fraction")
+
+plot_sig_ts(nf="out/ts_estimate_nightcount_annual.tif",
+            pv="out/ts_p_nightcount_annual.tif",
+            title = "Night Count")
+
+plot_sig_ts(nf="out/ts_estimate_daycount_annual.tif",
+            pv="out/ts_p_daycount_annual.tif",
+            title = "Day Count")
