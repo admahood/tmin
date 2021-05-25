@@ -454,6 +454,8 @@ ggarrange(p_dc, p_nc, p_nf, p_frp, nrow = 2, ncol=2) +
 
 # monthly ============
 
+workers<- detectCores()-1
+
 # night frp ===========
 # need to get the files in the correct order
 night_frp_m <- list.files("data/gridded_mod14/FRP_mean",
@@ -474,7 +476,7 @@ night_frp_stack_m<-raster::stack(pull(night_frp_m, value))
 # takes too long, just use the one from the annual calculations
 # sum_night_frp_m <- night_frp_m %>% raster::calc(sum)
 
-night_frp_stack_m[night_frp_stack_m== 0] <- NA # 5 minutes
+# night_frp_stack_m[night_frp_stack_m== 0] <- NA # 5 minutes
 
 night_frp_df_m <- night_frp_stack_m %>%
   as.data.frame(xy=TRUE) %>%
@@ -482,11 +484,11 @@ night_frp_df_m <- night_frp_stack_m %>%
   separate(filename, into = c("x1","x2", "x3","x4","month", "year"), 
            remove = FALSE, sep = "_") %>%
   mutate(xy = str_c(x,y)) %>%
-  filter(!is.na(value))
+  filter(value>0)
 
 night_frp_trends_m<-parallel_theilsen(night_frp_df_m,
                                       zero_to_na = TRUE,
-                                      workers=2, 
+                                      workers=workers, 
                                       minimum_sample = 30)
 
 p_frp <- ggplot(night_frp_trends_m %>% 
