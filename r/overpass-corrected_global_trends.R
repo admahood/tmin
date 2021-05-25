@@ -14,7 +14,7 @@ library(foreach)
 # library(EcoGenetics)
 
 # functions ========
-parallel_theilsen <- function(stack_df, zero_to_na=FALSE, 
+parallel_theilsen <- function(stack_df, zero_to_na=FALSE, pb =TRUE,
                               minimum_sample = 10, workers = 1){
   require(doParallel)
   require(foreach)
@@ -36,7 +36,7 @@ parallel_theilsen <- function(stack_df, zero_to_na=FALSE,
                  p = sum$coefficients[2,4],
                  beta = sum$coefficients[2,1],
                  n = nrow(dd))
-      system(paste("echo", df[1,1], df[1,2],"p=", df[1,3],"b=", df[1,4]))
+      if(pb) system(paste("echo", df[1,1], df[1,2],"p=", df[1,3],"b=", df[1,4]))
       return(df)
     }
   }
@@ -210,7 +210,7 @@ for(y in years){
 
 # annual =================
 
-# day counts
+# day counts===========
 day_counts <- list.files("data/annual_adjusted_counts", pattern = "day*", full.names = TRUE) %>%
   raster::stack()
 day_counts_25 <- list.files("data/annual_adjusted_counts_25", pattern = "day*", full.names = TRUE) %>%
@@ -454,7 +454,52 @@ ggarrange(p_dc, p_nc, p_nf, p_frp, nrow = 2, ncol=2) +
 
 # monthly ============
 
-workers<- detectCores()-1
+workers<- detectCores()/2
+# day counts ===========
+dc_m <- list.files("data/adjusted_counts",
+                          pattern = "*_D_*", full.names = TRUE)%>%
+  as_tibble  %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date)
+
+dc_stack_m<-raster::stack(pull(dc_m, value))
+sum_dc_m <- dc_stack_m %>% raster::calc(function(x)sum(x))
+dc_stack_m[sum_dc_m== 0] <- NA # 5 minutes
+
+dc_df_m <- dc_stack_m %>%
+  as.data.frame(xy=TRUE) %>%
+  pivot_longer(cols = names(.)[3:ncol(.)],names_to = "filename", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date) %>%
+  mutate(xy = str_c(x,y))
+
+dc_trends_m<-parallel_theilsen(dc_df_m,
+                                      zero_to_na = TRUE,
+                                      workers=workers, 
+                                      minimum_sample = 30)
+
+p_dc_m <- ggplot(dc_trends_m %>% 
+                  filter(p<0.05->alpha) %>% 
+                  mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = c("blue","red"))+
+  theme_void()+
+  ggtitle(paste("Monthly day detections, 1 degree, 2003-2018, p<0.05"))+
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/monthly_day_count_trend_1_deg_2003-2018.png")
 
 # night frp ===========
 # need to get the files in the correct order
