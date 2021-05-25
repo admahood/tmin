@@ -484,7 +484,7 @@ dc_df_m <- dc_stack_m %>%
   dplyr::arrange(date) %>%
   mutate(xy = str_c(x,y))
 
-dc_trends_m<-parallel_theilsen(dc_df_m,
+dc_trends_m<-parallel_theilsen(dc_df_m, pb=FALSE,
                                       zero_to_na = TRUE,
                                       workers=workers, 
                                       minimum_sample = 30)
@@ -496,10 +496,10 @@ p_dc_m <- ggplot(dc_trends_m %>%
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
-  ggtitle(paste("Monthly day detections, 1 degree, 2003-2018, p<0.05"))+
+  ggtitle(paste("Monthly daytime detections, 1 degree, 2003-2020, p<0.05"))+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
-  ggsave("out/monthly_day_count_trend_1_deg_2003-2018.png")
+  ggsave("out/monthly_day_count_trend_1_deg_2003-2020.png")
 
 # night frp ===========
 # need to get the files in the correct order
