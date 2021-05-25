@@ -118,36 +118,45 @@ mod14_night_counts_25<- list.files("data/gridded_mod14_2_5/AFC_num",
 dir.create("data/adjusted_counts")
 dir.create("data/adjusted_counts_25")
 
-for(i in 1:nrow(mod14_day_counts_25)){
-  print(i)
-  month <- mod14_day_counts_25$month_n[i]
+registerDoParallel(detectCores()-1)
+foreach(i = 1:nrow(mod14_day_counts))%dopar%{
+  system(paste("echo",i))
+  month <- mod14_day_counts$month_n[i]
   
-  counts <- raster::raster(mod14_day_counts_25$value[i])
-  overpasses<- raster::raster(op_days25[month])
+  counts <- raster::raster(mod14_day_counts$value[i])
+  overpasses<- raster::raster(op_days[month])
   
   adjusted <- counts/overpasses
-  outfile <- paste0("data/adjusted_counts_25/op-adjusted_D_", 
-                   mod14_day_counts_25$year[i],
+  outfile <- paste0("data/adjusted_counts/op-adjusted_D_", 
+                   mod14_day_counts$year[i],
                    str_pad(month, width=2, side="left", pad = "0"),
                    ".tif"
                    )
   writeRaster(adjusted,outfile, overwrite=TRUE)  
-}
 
-for(i in 1:nrow(mod14_night_counts_25)){
-  print(i)
-  month <- mod14_night_counts_25$month_n[i]
+  month_n <- mod14_night_counts$month_n[i]
   
-  counts <- raster::raster(mod14_night_counts_25$value[i])
-  overpasses<- raster::raster(op_nights25[month])
+  counts_n <- raster::raster(mod14_night_counts$value[i])
+  overpasses_n <- raster::raster(op_nights[month])
   
-  adjusted <- counts/overpasses
-  outfile <- paste0("data/adjusted_counts_25/op-adjusted_N_", 
-                    mod14_night_counts_25$year[i],
+  adjusted_n <- counts_n/overpasses_n
+  outfile_n <- paste0("data/adjusted_counts/op-adjusted_N_", 
+                    mod14_night_counts$year[i],
                     str_pad(month, width=2, side="left", pad = "0"),
                     ".tif"
   )
-  writeRaster(adjusted,outfile, overwrite=TRUE)
+  writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
+  
+  
+  if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
+  
+  nf<- adjusted_n/(adjusted+adjusted_n)
+  outfile_nf <- paste0("data/adjusted_counts/op-adjusted_NF_", 
+                      mod14_night_counts$year[i],
+                      str_pad(month, width=2, side="left", pad = "0"),
+                      ".tif"
+  )
+  writeRaster(nf,outfile_nf, overwrite=TRUE)}
 }
 
 # making things annual =====================
