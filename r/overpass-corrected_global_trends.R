@@ -485,7 +485,7 @@ dc_df_m <- dc_stack_m %>%
   mutate(xy = str_c(x,y))
 
 dc_trends_m<-parallel_theilsen(dc_df_m, pb=FALSE,
-                                      zero_to_na = TRUE,
+                                      zero_to_na = FALSE,
                                       workers=workers, 
                                       minimum_sample = 30)
 
@@ -500,6 +500,98 @@ p_dc_m <- ggplot(dc_trends_m %>%
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/monthly_day_count_trend_1_deg_2003-2020.png")
+
+# night counts ===========
+nc_m <- list.files("data/adjusted_counts",
+                   pattern = "*_N_*", full.names = TRUE)%>%
+  as_tibble  %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date)
+
+nc_stack_m<-raster::stack(pull(nc_m, value))
+sum_nc_m <- nc_stack_m %>% raster::calc(function(x)sum(x))
+nc_stack_m[sum_nc_m== 0] <- NA # 5 minutes
+
+nc_df_m <- nc_stack_m %>%
+  as.data.frame(xy=TRUE) %>%
+  pivot_longer(cols = names(.)[3:ncol(.)],names_to = "filename", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date) %>%
+  mutate(xy = str_c(x,y))
+
+nc_trends_m<-parallel_theilsen(nc_df_m, pb=FALSE,
+                               zero_to_na = FALSE,
+                               workers=workers, 
+                               minimum_sample = 30)
+
+p_nc_m <- ggplot(nc_trends_m %>% 
+                   filter(p<0.05->alpha) %>% 
+                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = c("blue","red"))+
+  theme_void()+
+  ggtitle(paste("Monthly nighttime detections, 1 degree, 2003-2020, p<0.05"))+
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/monthly_night_count_trend_1_deg_2003-2020.png")
+
+# night fraction ===========
+nf_m <- list.files("data/adjusted_counts",
+                   pattern = "*_NF_*", full.names = TRUE)%>%
+  as_tibble  %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date)
+
+nf_stack_m<-raster::stack(pull(nf_m, value))
+sum_nf_m <- nf_stack_m %>% raster::calc(function(x)sum(x))
+nf_stack_m[sum_nf_m== 0] <- NA # 5 minutes
+
+nf_df_m <- nf_stack_m %>%
+  as.data.frame(xy=TRUE) %>%
+  pivot_longer(cols = names(.)[3:ncol(.)],names_to = "filename", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
+         year = str_sub(ym, 1,4),
+         month = str_sub(ym, 5,6)) %>%
+  filter(year > 2002) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
+         month_n = lubridate::month(date)) %>%
+  dplyr::arrange(date) %>%
+  mutate(xy = str_c(x,y))
+
+nc_trends_m<-parallel_theilsen(nf_df_m, pb=FALSE,
+                               zero_to_na = FALSE,
+                               workers=workers, 
+                               minimum_sample = 30)
+
+p_nc_m <- ggplot(nc_trends_m %>% 
+                   filter(p<0.05->alpha) %>% 
+                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = c("blue","red"))+
+  theme_void()+
+  ggtitle(paste("Monthly nighttime detections, 1 degree, 2003-2020, p<0.05"))+
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/monthly_night_count_trend_1_deg_2003-2020.png")
 
 # night frp ===========
 # need to get the files in the correct order
