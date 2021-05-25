@@ -576,22 +576,22 @@ nf_df_m <- nf_stack_m %>%
   dplyr::arrange(date) %>%
   mutate(xy = str_c(x,y))
 
-nc_trends_m<-parallel_theilsen(nf_df_m, pb=FALSE,
+nf_trends_m<-parallel_theilsen(nf_df_m, pb=FALSE,
                                zero_to_na = FALSE,
                                workers=workers, 
                                minimum_sample = 30)
 
-p_nc_m <- ggplot(nc_trends_m %>% 
+p_nf_m <- ggplot(nf_trends_m %>% 
                    filter(p<0.05->alpha) %>% 
                    mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
   geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
-  ggtitle(paste("Monthly nighttime detections, 1 degree, 2003-2020, p<0.05"))+
+  ggtitle(paste("Monthly fraction of nighttime detections, 1 degree, 2003-2020, p<0.05"))+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
-  ggsave("out/monthly_night_count_trend_1_deg_2003-2020.png")
+  ggsave("out/monthly_night_fraction_trend_1_deg_2003-2020.png")
 
 # night frp ===========
 # need to get the files in the correct order
@@ -610,11 +610,6 @@ night_frp_m <- list.files("data/gridded_mod14/FRP_mean",
 
 night_frp_stack_m<-raster::stack(pull(night_frp_m, value))
 
-# takes too long, just use the one from the annual calculations
-# sum_night_frp_m <- night_frp_m %>% raster::calc(sum)
-
-# night_frp_stack_m[night_frp_stack_m== 0] <- NA # 5 minutes
-
 night_frp_df_m <- night_frp_stack_m %>%
   as.data.frame(xy=TRUE) %>%
   pivot_longer(cols = names(.)[3:ncol(.)],names_to = "filename", values_to = "value") %>%
@@ -628,18 +623,23 @@ night_frp_trends_m<-parallel_theilsen(night_frp_df_m,
                                       workers=workers, 
                                       minimum_sample = 30)
 
-p_frp <- ggplot(night_frp_trends_m %>% 
+p_frp_m <- ggplot(night_frp_trends_m %>% 
                   filter(p<0.05->alpha) %>% 
                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
   geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
-  ggtitle(paste("Trends in night FRP, 1 degree, 2003-2018, p<0.05"))+
+  ggtitle(paste("Monthly nighttime FRP, 1 degree, 2003-2020, p<0.05"))+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
-  ggsave("out/night_frp_trend_1_deg_2003-2018.png")
+  ggsave("out/night_frp_trend_1_deg_2003-2020.png")
 
+
+# 4pan
+library(ggpubr)
+ggarrange(p_dc_m, p_nc_m, p_nf_m, p_frp_m) +
+  ggsave(filename = "out/monthly_4pan.png", height = 7, width = 12)
 # plots ========
 plot_sig_ts <- function(nf, pv, title, binary=TRUE){
 
