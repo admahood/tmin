@@ -172,14 +172,14 @@ adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern 
 
 dir.create("data/aggregations_2003-2020")
 
-dc<-filter(adjusted_d) %>%
+dc<-adjusted_d %>%
   pull(value) %>%
   raster::stack() %>%
   sum
 writeRaster(dc, 
             filename = paste0("data/aggregations_2003-2020/day_adj_annual_counts.tif"),
             overwrite = TRUE)
-nc<-filter(adjusted_n, year == y) %>%
+nc<-adjusted_n %>%
   pull(value) %>%
   raster::stack() %>%
   sum
