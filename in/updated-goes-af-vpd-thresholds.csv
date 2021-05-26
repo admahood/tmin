@@ -1,0 +1,26 @@
+lc_name,vpd_thresh_hpa,sd,probability_of_zero
+Temperate Evergreen Needleleaf Forests,4.754,13.206358010136325,0.95
+Temperate Deciduous Broadleaf Forests,5.201,10.986596575113893,0.95
+Arid Open Shrublands,6.81,14.224071998700802,0.95
+Boreal Woody Savannas,7.64,11.675046325677116,0.95
+Temperate Woody Savannas,7.93,13.84220743619697,0.95
+Temperate Evergreen Broadleaf Forests,7.938,16.45931544946706,0.95
+Boreal Savannas,8.916,10.546381852093644,0.95
+Temperate Savannas,10.075,14.489835414190539,0.95
+Equatorial Permanent Wetlands,10.208,12.668592235494408,0.95
+Temperate Grasslands,10.963,15.611128669584987,0.95
+Arid Grasslands,11.057,17.104979723207254,0.95
+Boreal Grasslands,12.301,18.188436387392354,0.95
+Boreal Croplands,12.466,14.697307741721096,0.95
+Arid Savannas,12.603,18.805026456243553,0.95
+Equatorial Evergreen Broadleaf Forests,13.328,13.724969609831229,0.95
+Boreal Evergreen Needleleaf Forests,13.374,18.763053487537046,0.95
+Arid Woody Savannas,13.774,20.454028730088634,0.95
+Equatorial Deciduous Broadleaf Forests,14,14.443705224789817,0.95
+Equatorial Savannas,17.568,15.740620799166186,0.95
+Equatorial Woody Savannas,18.28,16.028178390026188,0.95
+Equatorial Grasslands,19.933,15.253759804985398,0.95
+Equatorial Cropland Natural Vegetation Mosaics,20.521,14.603520870729149,0.95
+Temperate Croplands,20.607,18.68158324533958,0.95
+Equatorial Croplands,21.711,16.922524954948386,0.95
+Arid Croplands,24.909,21.831246467444828,0.95

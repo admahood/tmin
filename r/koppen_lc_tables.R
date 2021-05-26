@@ -1,5 +1,6 @@
 library(tidyverse)
 library(stars)
+library(raster)
 library(s2)
 
 # koppen look up tables
@@ -25,7 +26,7 @@ lut_lc<-c( "Evergreen Needleleaf Forests",
            "Water Bodies")
 names(lut_lc) <- str_pad(1:17, width = 2, side = "left",pad = "0")
 
-lck<-read_stars("data/lc_koppen_2010_mode.tif")
+lck<-read_stars("lc_koppen_2010_mode.tif")
 lck_poly<-lck %>% 
   stars::st_xy2sfc(as_points = FALSE) %>%
   st_as_sf() %>%
@@ -58,11 +59,6 @@ write_csv(thresholds %>% dplyr::select(-area_km2),"data/lck_thresh_area.csv")
 total_land_area = lck_tab %>% pull(area_km2) %>% sum
 burnable_land_area = thresholds %>% pull(area_km2) %>% sum()
 burnable_land_area/(total_land_area)
-
-library(raster)
-xxx<-raster("data/adjusted_counts/op-adjusted_D_200301.tif")
-yyy<-raster("data/lc_koppen_2010_mode.tif")
-xxx==yyy
 
 # getting extended table 1 stats right here baby (michael's script has a lot of 
 # adjusting that is no longer necessary)
