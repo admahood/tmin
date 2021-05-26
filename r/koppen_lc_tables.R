@@ -172,22 +172,56 @@ adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern 
 
 dir.create("data/aggregations_2003-2020")
 
-dc<-adjusted_d %>%
-  pull(value) %>%
-  raster::stack() %>%
-  sum
-writeRaster(dc, 
-            filename = paste0("data/aggregations_2003-2020/day_adj_annual_counts.tif"),
-            overwrite = TRUE)
-nc<-adjusted_n %>%
-  pull(value) %>%
-  raster::stack() %>%
-  sum
-writeRaster(nc, 
-            filename = paste0("data/aggregations_2003-2020/night_adj_annual_counts.tif"),
-            overwrite = TRUE)
-ncf<- nc/(nc+dc)
-writeRaster(ncf, 
-            filename = paste0("data/aggregations_2003-2020/night_fraction_adj_annual_counts.tif"),
-            overwrite = TRUE)
 
+# dc<-adjusted_d %>%
+#   pull(value) %>%
+#   read_stars(along = "band") %>%
+#   st_apply(MARGIN = 1:2, FUN = function(x)sum(x, na.rm = TRUE))
+# 
+# write_stars(dc, 
+#             dsn = paste0("data/aggregations_2003-2020/day_counts.tif"))
+dcr<-adjusted_d %>%
+  pull(value) %>%
+  raster::stack()%>%
+  raster::calc(function(x)sum(x, na.rm=T)) #1752
+writeRaster(dcr, filename = "data/aggregations_2003-2020/day_counts_rast.tif")
+ncr<-adjusted_n %>%
+  pull(value) %>%
+  raster::stack()%>%
+  raster::calc(function(x)sum(x, na.rm=T)) #1746
+writeRaster(ncr, filename = "data/aggregations_2003-2020/night_counts_rast.tif")
+
+ncfr<- ncr/(ncr+dcr)
+writeRaster(ncfr, filename = "data/aggregations_2003-2020/night_fraction_rast.tif")
+
+# 
+# nc<-adjusted_n %>%
+#   pull(value) %>%
+#   read_stars(along = "band") %>%
+#   st_apply(MARGIN = 1:2, FUN = function(x)sum(x, na.rm = TRUE))
+# write_stars(nc, 
+#             dsn = paste0("data/aggregations_2003-2020/night_counts.tif"))
+# ncf<- nc/(nc+dc)
+# write_stars(ncf, 
+#             dsn = paste0("data/aggregations_2003-2020/night_fraction.tif"))
+
+# then match the lck layer, stack the aggregations, make a table =====
+
+lckrastsh<-raster::shift(x = lckrast, dx = -179.75, dy = -0.25) %>%
+  writeRaster("data/aggregations_2003-2020/aaalck_shifted.tif")
+
+aggregation_tables <- list.files("data/aggregations_2003-2020", full.names = TRUE) %>%
+  sort()%>%
+  raster::stack() %>%
+  as.data.frame() %>%
+  filter(!is.na(aaalck_shifted)) %>%
+  group_by(lck = aaalck_shifted) %>%
+  summarise(day_counts = sum(day_counts, na.rm=TRUE),
+            night_counts = sum(night_counts, na.rm=TRUE),
+            night_fraction = mean(night_fraction, na.rm=TRUE)) %>%
+  ungroup%>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         lc_kop = paste(kop, lc)) %>%
+  dplyr::select(lc_kop, day_counts, night_counts, night_fraction) %>%
+  na.omit()
