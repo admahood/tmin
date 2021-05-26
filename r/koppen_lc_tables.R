@@ -3,7 +3,7 @@ library(stars)
 library(raster)
 library(s2)
 
-# koppen look up tables
+# koppen look up tables=========
 lut_kop<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
 names(lut_kop) <- c(1,2,3,4,5)
 
@@ -26,15 +26,19 @@ lut_lc<-c( "Evergreen Needleleaf Forests",
            "Water Bodies")
 names(lut_lc) <- str_pad(1:17, width = 2, side = "left",pad = "0")
 
-lck<-read_stars("lc_koppen_2010_mode.tif")
+# reading stuff in ===============
+lck<-read_stars("in/lc_koppen_2010_mode.tif")
+
+# calculating area ==========
 lck_poly<-lck %>% 
   stars::st_xy2sfc(as_points = FALSE) %>%
   st_as_sf() %>%
   as_tibble() %>% 
-  select(lck = lc_koppen_2010_mode.tif, geometry)  %>% 
+  dplyr::select(lck = lc_koppen_2010_mode.tif, geometry)  %>% 
   mutate(geometry = as_s2_geography(geometry)) %>%
   mutate(area_km2 = s2_area(geometry)/1000000)
 
+# summarising by landcover/koppen =======
 lck_tab <- lck_poly %>%
   st_as_sf %>%
   st_set_geometry(NULL) %>%
@@ -46,7 +50,8 @@ lck_tab <- lck_poly %>%
          lc_kop = paste(kop, lc)) %>%
   na.omit
 
-thresholds <- read_csv("data/updated-goes-af-vpd-thresholds.csv") %>%
+# making a table with the thresholds ==========
+thresholds <- read_csv("in/updated-goes-af-vpd-thresholds.csv") %>%
   dplyr::select(lc_kop = lc_name, vpd_thresh_hpa, sd) %>%
   left_join(lck_tab %>% dplyr::select(lc_kop, area_km2)) %>%
   mutate(millions_of_km2 = area_km2/1000000) %>%
@@ -57,28 +62,30 @@ write_csv(thresholds %>% dplyr::select(-area_km2),"data/lck_thresh_area.csv")
 
 #148940000 km2 (from wikipedia)
 total_land_area = lck_tab %>% pull(area_km2) %>% sum
-burnable_land_area = thresholds %>% pull(area_km2) %>% sum()
-burnable_land_area/(total_land_area)
+burnable_land_area = thresholds %>% pull(area_km2) %>% sum() # 90M km2
+burnable_land_area/(total_land_area) # this is where I got the 62% for the paper
 
 # getting extended table 1 stats right here baby (michael's script has a lot of 
 # adjusting that is no longer necessary)
 
 # doing the overpass adjustment for 0.25 degrees================================
-dir.create("data/adjusted_counts_025")
+dir.create("data/adjusted_counts_025", recursive=T)
 
 # getting files
 system(paste("aws s3 sync",
              "s3://earthlab-jmcglinchy/night_fire/gridded/vars_refresh_may2021/CSV_nocorn_grid_0_25_degree_vars",
-             "data/gridded_mod14_025"))
+             "data/gridded_mod14_025",
+             "--only-show-errors"))
 
 system(paste("aws s3 sync",
              "s3://earthlab-mkoontz/MODIS-overpass-counts_0.25_analysis-ready/month_2003-2020/",
-             "data/overpass_counts_025"))
+             "data/overpass_counts_025",
+             "--only-show-errors"))
 
 # creating the lists of files
-op_days <- list.files("data/overpass_counts_025/month_2003-2020", 
+op_days <- list.files("data/overpass_counts_025", 
                       full.names = TRUE, pattern = "*day*") 
-op_nights <- list.files("data/overpass_counts_025/month_2003-2020", 
+op_nights <- list.files("data/overpass_counts_025", 
                         full.names = TRUE, pattern = "*night*")
 
 mod14_day_counts_025<- list.files("data/gridded_mod14_025/AFC_num", 
