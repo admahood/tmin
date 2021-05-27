@@ -228,11 +228,33 @@ foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
 
 # aggregation ==============
 
-adjusted_n <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "_N_") %>%
+adjusted_n <- list.files("data/adjusted_counts_025", 
+                         full.names = TRUE, pattern = "_N_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "_D_")%>%
+adjusted_d <- list.files("data/adjusted_counts_025", 
+                         full.names = TRUE, pattern = "_D_")%>%
+  as_tibble() %>%
+  mutate(year = str_extract(value,"\\d{4}"))
+
+adjusted_nf <- list.files("data/adjusted_counts_025", 
+                         full.names = TRUE, pattern = "_NF_") %>%
+  as_tibble() %>%
+  mutate(year = str_extract(value,"\\d{4}"))
+
+adjusted_n_frp <- list.files("data/adjusted_frp_025", 
+                             full.names = TRUE, pattern = "_N_") %>%
+  as_tibble() %>%
+  mutate(year = str_extract(value,"\\d{4}"))
+
+adjusted_d_frp <- list.files("data/adjusted_frp_025",
+                             full.names = TRUE, pattern = "_D_")%>%
+  as_tibble() %>%
+  mutate(year = str_extract(value,"\\d{4}"))
+
+adjusted_nf_frp <- list.files("data/adjusted_frp_025", 
+                             full.names = TRUE, pattern = "_NF_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
@@ -251,7 +273,8 @@ dir.create("out/aggregations_2003-2020")
 # write_stars(dc, 
 #             dsn = paste0("data/aggregations_2003-2020/day_counts.tif"))
 
-
+# counts ==================
+# day counts
 dcr<-adjusted_d %>%
   pull(value) %>%
   raster::stack()
@@ -264,7 +287,7 @@ writeRaster(dcrxx,
             filename = "out/aggregations_2003-2020/day_counts_rast.tif",
             overwrite=T)
 
-
+# night counts
 ncr<-adjusted_n %>%
   pull(value) %>%
   raster::stack()
@@ -277,9 +300,67 @@ writeRaster(ncrxx,
             filename = "out/aggregations_2003-2020/night_counts_rast.tif", 
             overwrite=T)
 
+# doing night fraction both ways just to make sure it's not different
+nfr<-adjusted_nf %>%
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()  
+nfrxx <- clusterR(ncr, function(x)mean(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(nfrxx, 
+            filename = "out/aggregations_2003-2020/night_fraction_rast1.tif", 
+            overwrite=T)
+
 ncfr<- ncrxx/(ncrxx+dcrxx)
 writeRaster(ncfr, 
             filename = "out/aggregations_2003-2020/night_fraction_rast.tif", 
+            overwrite=T)
+
+# frp=========
+# day frp
+dfrp <-adjusted_d_frp %>%
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()
+dfrpxx <- clusterR(dfrp, function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(dfrpxx, 
+            filename = "out/aggregations_2003-2020/day_frp_rast.tif",
+            overwrite=T)
+
+# night counts
+nfrp<- adjusted_n_frp %>%
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()  
+nfrpxx <- clusterR(nfrp, function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(nfrpxx, 
+            filename = "out/aggregations_2003-2020/night_frp_rast.tif", 
+            overwrite=T)
+
+# doing night fraction both ways just to make sure it's not different
+nffrp<-adjusted_nf_frp %>%
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()  
+nffrpxx <- clusterR(nffrp, function(x)mean(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(nffrpxx, 
+            filename = "out/aggregations_2003-2020/night_fraction_frp_rast1.tif", 
+            overwrite=T)
+
+nffrp1<- nfrpxx/(nfrpxx+dfrpxx)
+writeRaster(nffrp1, 
+            filename = "out/aggregations_2003-2020/night_fraction_frp_rast.tif", 
             overwrite=T)
 
 # 
