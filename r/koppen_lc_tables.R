@@ -403,10 +403,13 @@ aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE
 
 final_table <- left_join(thresholds %>% dplyr::select(-area_km2),
                          aggregation_tables, by = "lc_kop") %>%
-  mutate(day_counts = day_counts/millions_of_km2,
-         night_counts = night_counts/millions_of_km2,
-         day_frp = day_frp/millions_of_km2,
-         night_frp = night_frp/millions_of_km2) %>%
+  mutate(day_counts = day_counts/millions_of_km2 %>% round(1),
+         night_counts = night_counts/millions_of_km2 %>% round(1),
+         day_frp = day_frp/millions_of_km2 %>% round(1),
+         night_frp = night_frp/millions_of_km2 %>% round(1),
+         night_fraction = night_fraction*100 %>% round(1),
+         night_fraction_frp = night_fraction_frp*100 %>% round(1),
+         millions_of_km2 = round(millions_of_km2, 1)) %>%
   dplyr::select(lc_kop, millions_of_km2, day_counts, night_counts, night_fraction,
                 day_frp, night_frp, night_fraction_frp)
 
