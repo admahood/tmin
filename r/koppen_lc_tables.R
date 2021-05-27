@@ -72,6 +72,7 @@ burnable_land_area/(total_land_area) # this is where I got the 62% for the paper
 
 # doing the overpass adjustment for 0.25 degrees================================
 dir.create("data/adjusted_counts_025", recursive=T)
+dir.create("data/adjusted_frp_025", recursive=T)
 
 # getting files
 system(paste("aws s3 sync",
@@ -84,19 +85,23 @@ system(paste("aws s3 sync",
              "data/overpass_counts_025",
              "--only-show-errors"))
 
-# creating the lists of files
+# creating the lists of files ==================================================
+# overpass counts
 op_days_025 <- list.files("data/overpass_counts_025", 
                       full.names = TRUE, pattern = "*day*") 
 op_nights_025 <- list.files("data/overpass_counts_025", 
                         full.names = TRUE, pattern = "*night*")
 
+# day and night counts
 mod14_day_counts_025<- list.files("data/gridded_mod14_025/AFC_num", 
                               full.names = TRUE,
                               pattern = "_D_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
   filter(year > 2002)%>%
-  separate(value, sep = "_", into = c("g1", "g2","g3","g9","g4","g5","g7","month","g6"), remove = FALSE) %>%
+  separate(value, sep = "_", 
+           into = c("g1", "g2","g3","g9","g4","g5","g7","month","g6"),
+           remove = FALSE) %>%
   dplyr::select(-starts_with("g")) %>%
   mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
          month_n = lubridate::month(date))
@@ -112,11 +117,34 @@ mod14_night_counts_025 <- list.files("data/gridded_mod14_025/AFC_num",
   mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
          month_n = lubridate::month(date)) 
 
+# day and night total frp
+mod14_day_frp_025<- list.files("data/gridded_mod14_025/FRP_total", 
+                                  full.names = TRUE,
+                                  pattern = "_D_") %>%
+  as_tibble() %>%
+  mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
+  filter(year > 2002)%>%
+  separate(value, sep = "_", into = c("g1", "g2","g3","g9","g4","g5","g7","month","g6"), remove = FALSE) %>%
+  dplyr::select(-starts_with("g")) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
+         month_n = lubridate::month(date))
+
+mod14_night_frp_025 <- list.files("data/gridded_mod14_025/FRP_total", 
+                                     full.names = TRUE,
+                                     pattern = "_N_") %>%
+  as_tibble  %>%
+  mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
+  filter(year > 2002) %>%
+  separate(value, sep = "_", into = c("g1", "g2","g3","g4","g5","g6","g7","month", "g8"), remove = FALSE) %>%
+  dplyr::select(-starts_with("g")) %>%
+  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
+         month_n = lubridate::month(date))
+
 # adjusting the counts in parallel ===========
-
-
 registerDoParallel(detectCores()-1)
 foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
+  # counts ==========
+  # day counts
   system(paste("echo",i))
   month <- mod14_day_counts_025$month_n[i]
   
@@ -131,6 +159,7 @@ foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
   )
   writeRaster(adjusted,outfile, overwrite=TRUE)  
   
+  # night counts
   month_n <- mod14_night_counts_025$month_n[i]
   
   counts_n <- raster::raster(mod14_night_counts_025$value[i])
@@ -144,12 +173,53 @@ foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
   )
   writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
   
-  
+  # night fraction
   if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
     
     nf<- adjusted_n/(adjusted+adjusted_n)
     outfile_nf <- paste0("data/adjusted_counts_025/op-adjusted_NF_", 
                          mod14_night_counts_025$year[i],
+                         str_pad(month, width=2, side="left", pad = "0"),
+                         ".tif"
+    )
+    writeRaster(nf,outfile_nf, overwrite=TRUE)}
+  rm(month, counts, overpasses, adjusted, outfile, 
+     month_n, counts_n, overpasses_n, adjusted_n, outfile_n)
+  ## FRP ==========
+  # day frp
+  month <- mod14_day_frp_025$month_n[i]
+  
+  counts <- raster::raster(mod14_day_frp_025$value[i])
+  overpasses<- raster::raster(op_days_025[month])
+  
+  adjusted <- counts/overpasses
+  outfile <- paste0("data/adjusted_frp_025/op-adjusted_D_", 
+                    mod14_day_frp_025$year[i],
+                    str_pad(month, width=2, side="left", pad = "0"),
+                    ".tif"
+  )
+  writeRaster(adjusted,outfile, overwrite=TRUE)  
+  
+  # night frp
+  month_n <- mod14_night_frp_025$month_n[i]
+  
+  counts_n <- raster::raster(mod14_night_frp_025$value[i])
+  overpasses_n <- raster::raster(op_nights_025[month_n])
+  
+  adjusted_n <- counts_n/overpasses_n
+  outfile_n <- paste0("data/adjusted_frp_025/op-adjusted_N_", 
+                      mod14_night_frp_025$year[i],
+                      str_pad(month, width=2, side="left", pad = "0"),
+                      ".tif"
+  )
+  writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
+  
+  # night fraction
+  if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
+    
+    nf<- adjusted_n/(adjusted+adjusted_n)
+    outfile_nf <- paste0("data/adjusted_frp_025/op-adjusted_NF_", 
+                         mod14_night_frp_025$year[i],
                          str_pad(month, width=2, side="left", pad = "0"),
                          ".tif"
     )
@@ -181,14 +251,15 @@ dir.create("out/aggregations_2003-2020")
 # write_stars(dc, 
 #             dsn = paste0("data/aggregations_2003-2020/day_counts.tif"))
 
-beginCluster()
 
 dcr<-adjusted_d %>%
   pull(value) %>%
   raster::stack()
 
+beginCluster()
 dcrxx <- clusterR(dcr, function(x)sum(x, na.rm=T), verbose=T)
 endCluster()
+
 writeRaster(dcrxx, 
             filename = "out/aggregations_2003-2020/day_counts_rast.tif",
             overwrite=T)
@@ -201,6 +272,7 @@ ncr<-adjusted_n %>%
 beginCluster()  
 ncrxx <- clusterR(ncr, function(x)sum(x, na.rm=T), verbose=T)
 endCluster()
+
 writeRaster(ncrxx, 
             filename = "out/aggregations_2003-2020/night_counts_rast.tif", 
             overwrite=T)
