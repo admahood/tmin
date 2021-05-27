@@ -60,7 +60,7 @@ thresholds <- read_csv("in/updated-goes-af-vpd-thresholds.csv") %>%
   # dplyr::select(-area_km2) %>%
   arrange(lc_kop)
 
-write_csv(thresholds %>% dplyr::select(-area_km2),"data/lck_thresh_area.csv")
+write_csv(thresholds %>% dplyr::select(-area_km2),"out/lck_thresh_area.csv")
 
 #148940000 km2 (from wikipedia)
 total_land_area = lck_tab %>% pull(area_km2) %>% sum
@@ -101,7 +101,7 @@ mod14_day_counts_025<- list.files("data/gridded_mod14_025/AFC_num",
   mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
          month_n = lubridate::month(date))
 
-mod14_night_counts_025<- list.files("data/gridded_mod14_025/AFC_num", 
+mod14_night_counts_025 <- list.files("data/gridded_mod14_025/AFC_num", 
                                    full.names = TRUE,
                                    pattern = "_N_") %>%
   as_tibble  %>%
@@ -158,11 +158,11 @@ foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
 
 # aggregation ==============
 
-adjusted_n <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "*_N_*") %>%
+adjusted_n <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "_N_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "*_D_*")%>%
+adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern = "_D_")%>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
@@ -170,7 +170,7 @@ adjusted_d <- list.files("data/adjusted_counts_025", full.names = TRUE, pattern 
 #   as_tibble() %>%
 #   mutate(year = str_extract(value,"\\d{4}"))
 
-dir.create("data/aggregations_2003-2020")
+dir.create("out/aggregations_2003-2020")
 
 
 # dc<-adjusted_d %>%
@@ -180,19 +180,35 @@ dir.create("data/aggregations_2003-2020")
 # 
 # write_stars(dc, 
 #             dsn = paste0("data/aggregations_2003-2020/day_counts.tif"))
+
+beginCluster()
+
 dcr<-adjusted_d %>%
   pull(value) %>%
-  raster::stack()%>%
-  raster::calc(function(x)sum(x, na.rm=T)) #1752
-writeRaster(dcr, filename = "data/aggregations_2003-2020/day_counts_rast.tif")
+  raster::stack()
+
+dcrxx <- clusterR(dcr, function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+writeRaster(dcrxx, 
+            filename = "out/aggregations_2003-2020/day_counts_rast.tif",
+            overwrite=T)
+
+
 ncr<-adjusted_n %>%
   pull(value) %>%
-  raster::stack()%>%
-  raster::calc(function(x)sum(x, na.rm=T)) #1746
-writeRaster(ncr, filename = "data/aggregations_2003-2020/night_counts_rast.tif")
+  raster::stack()
 
-ncfr<- ncr/(ncr+dcr)
-writeRaster(ncfr, filename = "data/aggregations_2003-2020/night_fraction_rast.tif")
+beginCluster()  
+ncrxx <- clusterR(ncr, function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+writeRaster(ncrxx, 
+            filename = "out/aggregations_2003-2020/night_counts_rast.tif", 
+            overwrite=T)
+
+ncfr<- ncrxx/(ncrxx+dcrxx)
+writeRaster(ncfr, 
+            filename = "out/aggregations_2003-2020/night_fraction_rast.tif", 
+            overwrite=T)
 
 # 
 # nc<-adjusted_n %>%
@@ -208,17 +224,17 @@ writeRaster(ncfr, filename = "data/aggregations_2003-2020/night_fraction_rast.ti
 # then match the lck layer, stack the aggregations, make a table =====
 
 lckrastsh<-raster::shift(x = lckrast, dx = -179.75, dy = -0.25) %>%
-  writeRaster("data/aggregations_2003-2020/aaalck_shifted.tif")
+  writeRaster("out/aggregations_2003-2020/aaalck_shifted.tif")
 
-aggregation_tables <- list.files("data/aggregations_2003-2020", full.names = TRUE) %>%
+aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE) %>%
   sort()%>%
   raster::stack() %>%
   as.data.frame() %>%
   filter(!is.na(aaalck_shifted)) %>%
   group_by(lck = aaalck_shifted) %>%
-  summarise(day_counts = sum(day_counts, na.rm=TRUE),
-            night_counts = sum(night_counts, na.rm=TRUE),
-            night_fraction = mean(night_fraction, na.rm=TRUE)) %>%
+  summarise(day_counts = sum(day_counts_rast, na.rm=TRUE),
+            night_counts = sum(night_counts_rast, na.rm=TRUE),
+            night_fraction = mean(night_fraction_rast, na.rm=TRUE)) %>%
   ungroup%>%
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
