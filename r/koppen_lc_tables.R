@@ -227,7 +227,9 @@ foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
 }
 
 # aggregation ==============
+dir.create("out/aggregations_2003-2020")
 
+# getting filenames ===================
 adjusted_n <- list.files("data/adjusted_counts_025", 
                          full.names = TRUE, pattern = "_N_") %>%
   as_tibble() %>%
@@ -258,13 +260,9 @@ adjusted_nf_frp <- list.files("data/adjusted_frp_025",
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-# frp <- list.files("data/gridded_mod14_2_5/FRP_mean", pattern = "*_N_*", full.names = TRUE) %>%
-#   as_tibble() %>%
-#   mutate(year = str_extract(value,"\\d{4}"))
+# doing the aggregation =====================================
 
-dir.create("out/aggregations_2003-2020")
-
-
+# this is the stars method which was actually faster... 
 # dc<-adjusted_d %>%
 #   pull(value) %>%
 #   read_stars(along = "band") %>%
@@ -300,25 +298,13 @@ writeRaster(ncrxx,
             filename = "out/aggregations_2003-2020/night_counts_rast.tif", 
             overwrite=T)
 
-# doing night fraction both ways just to make sure it's not different
-nfr<-adjusted_nf %>%
-  pull(value) %>%
-  raster::stack()
-
-beginCluster()  
-nfrxx <- clusterR(ncr, function(x)mean(x, na.rm=T), verbose=T)
-endCluster()
-
-writeRaster(nfrxx, 
-            filename = "out/aggregations_2003-2020/night_fraction_rast1.tif", 
-            overwrite=T)
-
+# night fraction 
 ncfr<- ncrxx/(ncrxx+dcrxx)
 writeRaster(ncfr, 
             filename = "out/aggregations_2003-2020/night_fraction_rast.tif", 
             overwrite=T)
 
-# frp=========
+# frp ==========================================================================
 # day frp
 dfrp <-adjusted_d_frp %>%
   pull(value) %>%
@@ -332,7 +318,7 @@ writeRaster(dfrpxx,
             filename = "out/aggregations_2003-2020/day_frp_rast.tif",
             overwrite=T)
 
-# night counts
+# night frp
 nfrp<- adjusted_n_frp %>%
   pull(value) %>%
   raster::stack()
@@ -345,40 +331,19 @@ writeRaster(nfrpxx,
             filename = "out/aggregations_2003-2020/night_frp_rast.tif", 
             overwrite=T)
 
-# doing night fraction both ways just to make sure it's not different
-nffrp<-adjusted_nf_frp %>%
-  pull(value) %>%
-  raster::stack()
-
-beginCluster()  
-nffrpxx <- clusterR(nffrp, function(x)mean(x, na.rm=T), verbose=T)
-endCluster()
-
-writeRaster(nffrpxx, 
-            filename = "out/aggregations_2003-2020/night_fraction_frp_rast1.tif", 
-            overwrite=T)
+# night fraction
 
 nffrp1<- nfrpxx/(nfrpxx+dfrpxx)
 writeRaster(nffrp1, 
             filename = "out/aggregations_2003-2020/night_fraction_frp_rast.tif", 
             overwrite=T)
 
-# 
-# nc<-adjusted_n %>%
-#   pull(value) %>%
-#   read_stars(along = "band") %>%
-#   st_apply(MARGIN = 1:2, FUN = function(x)sum(x, na.rm = TRUE))
-# write_stars(nc, 
-#             dsn = paste0("data/aggregations_2003-2020/night_counts.tif"))
-# ncf<- nc/(nc+dc)
-# write_stars(ncf, 
-#             dsn = paste0("data/aggregations_2003-2020/night_fraction.tif"))
-
-# then match the lck layer, stack the aggregations, make a table =====
+# shifting the lck layer =====
 
 lckrastsh<-raster::shift(x = lckrast, dx = -179.75, dy = -0.25) %>%
   writeRaster("out/aggregations_2003-2020/aaalck_shifted.tif")
 
+# making the table from the aggregated rasters ========
 aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE) %>%
   sort()%>%
   raster::stack() %>%
