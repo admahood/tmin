@@ -388,7 +388,7 @@ aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE
   summarise(day_counts = sum(day_counts_rast, na.rm=TRUE),
             night_counts = sum(night_counts_rast, na.rm=TRUE),
             night_fraction = mean(night_fraction_rast, na.rm=TRUE),
-            night_fraction1 = mean(night_graction_rast1, na.rm=TRUE),
+            night_fraction1 = mean(night_fraction_rast1, na.rm=TRUE),
             day_frp = sum(day_frp_rast, na.rm=TRUE),
             night_frp = sum(night_frp_rast, na.rm=TRUE),
             night_fraction_frp = mean(night_fraction_rast, na.rm=TRUE),
@@ -397,5 +397,17 @@ aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
          lc_kop = paste(kop, lc)) %>%
-  dplyr::select(lc_kop, day_counts, night_counts, night_fraction) %>%
+  dplyr::select(lc_kop, day_counts, night_counts, night_fraction, 
+                day_frp, night_frp, night_fraction_frp) %>%
   na.omit()
+
+final_table <- left_join(thresholds %>% dplyr::select(-area_km2),
+                         aggregation_tables, by = "lc_kop") %>%
+  mutate(day_counts = day_counts/millions_of_km2,
+         night_counts = night_counts/millions_of_km2,
+         day_frp = day_frp/millions_of_km2,
+         night_frp = night_frp/millions_of_km2) %>%
+  dplyr::select(lc_kop, millions_of_km2, day_counts, night_counts, night_fraction,
+                day_frp, night_frp, night_fraction_frp)
+
+write_csv(final_table,"out/table_s1.csv")
