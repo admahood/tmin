@@ -387,7 +387,12 @@ aggregation_tables <- list.files("out/aggregations_2003-2020", full.names = TRUE
   group_by(lck = aaalck_shifted) %>%
   summarise(day_counts = sum(day_counts_rast, na.rm=TRUE),
             night_counts = sum(night_counts_rast, na.rm=TRUE),
-            night_fraction = mean(night_fraction_rast, na.rm=TRUE)) %>%
+            night_fraction = mean(night_fraction_rast, na.rm=TRUE),
+            night_fraction1 = mean(night_graction_rast1, na.rm=TRUE),
+            day_frp = sum(day_frp_rast, na.rm=TRUE),
+            night_frp = sum(night_frp_rast, na.rm=TRUE),
+            night_fraction_frp = mean(night_fraction_rast, na.rm=TRUE),
+            night_fraction_frp1 = mean(night_fraction_rast1, na.rm=TRUE)) %>%
   ungroup%>%
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
