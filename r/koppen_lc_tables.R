@@ -357,7 +357,7 @@ aggregation_tables <- list.files("out/aggregations_2003-2020",
   as.data.frame() %>%
   filter(!is.na(aaalck_shifted)) %>%
   group_by(lck = aaalck_shifted) %>%
-  summarise(day_counts = sum(day_counts_rast, na.rm=TRUE)/216,
+  summarise(day_counts = sum(day_counts_rast, na.rm=TRUE)/216, 
             night_counts = sum(night_counts_rast, na.rm=TRUE)/216,
             night_fraction = mean(night_fraction_rast, na.rm=TRUE),
             day_frp = sum(day_frp_rast, na.rm=TRUE)/216,
