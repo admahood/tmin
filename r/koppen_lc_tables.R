@@ -30,15 +30,40 @@ names(lut_lc) <- str_pad(1:17, width = 2, side = "left",pad = "0")
 
 # reading lck in ===============================================================
 lck<-read_stars("in/lc_koppen_2010_mode.tif")
+lck_s <- read_stars("out/aggregations_2003-2020/lck_shifted.tif")
+d_ovp <- read_stars("out/aggregations_2003-2020/2003-2020_day_overpass-count.tif")
+n_ovp <- read_stars("out/aggregations_2003-2020/2003-2020_night_overpass-count.tif")
 
 # calculating area =============================================================
-lck_poly<-lck %>% 
+lck_poly<-lck_s %>% 
   stars::st_xy2sfc(as_points = FALSE) %>%
   st_as_sf() %>%
   as_tibble() %>% 
-  dplyr::select(lck = lc_koppen_2010_mode.tif, geometry)  %>% 
+  dplyr::select(lck = lck_shifted.tif, geometry)  %>% 
   mutate(geometry = as_s2_geography(geometry)) %>%
   mutate(area_km2 = s2_area(geometry)/1000000)
+
+
+lck_sf<-lck_s %>% 
+  stars::st_xy2sfc(as_points = FALSE) %>%
+  st_as_sf() %>%
+  mutate(area_km2 = st_area(.)/1000000)
+
+d_ovp_area<-d_ovp %>% 
+  stars::st_xy2sfc(as_points = FALSE) %>%
+  st_as_sf() %>% 
+  mutate(area_km2 =(st_area(.) %>% as.numeric)/1000000)
+
+n_ovp_area<-n_ovp %>% 
+  stars::st_xy2sfc(as_points = FALSE) %>%
+  st_as_sf() %>% 
+  mutate(area_km2 =(st_area(.) %>% as.numeric)/1000000)
+
+st_join(lck_sf, d_ovp_area)
+
+
+  
+  
 
 # summarising area by landcover/koppen =========================================
 lck_tab <- lck_poly %>%
@@ -72,8 +97,8 @@ burnable_land_area/(total_land_area) # this is where I got the 62% for the paper
 # adjusting that is no longer necessary)
 
 # doing the overpass adjustment for 0.25 degrees================================
-dir.create("data/adjusted_counts_025", recursive=T)
-dir.create("data/adjusted_frp_025", recursive=T)
+# dir.create("data/adjusted_counts_025", recursive=T)
+# dir.create("data/adjusted_frp_025", recursive=T)
 
 # getting files ================================================================
 system(paste("aws s3 sync",
@@ -82,30 +107,27 @@ system(paste("aws s3 sync",
              "--only-show-errors"))
 
 system(paste("aws s3 sync",
-             "s3://earthlab-mkoontz/MODIS-overpass-counts_0.25_analysis-ready/year-month",
-             "data/overpass_counts_025",
+             "s3://earthlab-mkoontz/MODIS-overpass-counts_0.25_analysis-ready/2003-2020",
+             "out/aggregations_2003-2020",
              "--only-show-errors"))
 
-# creating the lists of files ==================================================
-# overpass counts
-op_days_025 <- list.files("data/overpass_counts_025", 
-                      full.names = TRUE, pattern = "*day*") 
-op_nights_025 <- list.files("data/overpass_counts_025", 
-                        full.names = TRUE, pattern = "*night*")
+# aggregation ==================================================================
+dir.create("out/aggregations_2003-2020")
 
-# day and night counts
-mod14_day_counts_025<- list.files("data/gridded_mod14_025/AFC_num", 
-                              full.names = TRUE,
-                              pattern = "_D_") %>%
+mod14_day_counts_025 <- list.files("data/gridded_mod14_025/AFC_num", 
+                                  full.names = TRUE,
+                                  pattern = "_D_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
   filter(year > 2002)%>%
-  separate(value, sep = "_", 
-           into = c("g1", "g2","g3","g9","g4","g5","g7","month","g6"),
-           remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date))
+  pull(value) %>%
+  raster::stack()
+beginCluster()
+raw_day_counts <- clusterR(mod14_day_counts_025, function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(raw_day_counts, "out/aggregations_2003-2020/raw_day_counts.tif",
+            overwrite=TRUE)
 
 mod14_night_counts_025 <- list.files("data/gridded_mod14_025/AFC_num", 
                                    full.names = TRUE,
@@ -113,10 +135,16 @@ mod14_night_counts_025 <- list.files("data/gridded_mod14_025/AFC_num",
   as_tibble  %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
   filter(year > 2002) %>%
-  separate(value, sep = "_", into = c("g1", "g2","g3","g4","g5","g6","g7","month", "g8"), remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date)) 
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()
+raw_night_counts <- clusterR(mod14_night_counts_025, 
+                             function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(raw_night_counts, "out/aggregations_2003-2020/raw_night_counts.tif",
+            overwrite=TRUE)
 
 # day and night total frp
 mod14_day_frp_025<- list.files("data/gridded_mod14_025/FRP_total", 
@@ -124,11 +152,17 @@ mod14_day_frp_025<- list.files("data/gridded_mod14_025/FRP_total",
                                   pattern = "_D_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
-  filter(year > 2002)%>%
-  separate(value, sep = "_", into = c("g1", "g2","g3","g9","g4","g5","g7","month","g6"), remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date))
+  filter(year > 2002) %>%
+  pull(value) %>%
+  raster::stack()
+
+beginCluster()
+raw_day_frp_sum <- clusterR(mod14_day_frp_025, 
+                            function(x)sum(x, na.rm=T), verbose=T)
+endCluster()
+
+writeRaster(raw_day_frp_sum, "out/aggregations_2003-2020/raw_day_frp_sum.tif",
+            overwrite=TRUE)
 
 mod14_night_frp_025 <- list.files("data/gridded_mod14_025/FRP_total", 
                                      full.names = TRUE,
@@ -136,262 +170,89 @@ mod14_night_frp_025 <- list.files("data/gridded_mod14_025/FRP_total",
   as_tibble  %>%
   mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
   filter(year > 2002) %>%
-  separate(value, sep = "_", into = c("g1", "g2","g3","g4","g5","g6","g7","month", "g8"), remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date))
-
-# adjusting the counts in parallel =============================================
-registerDoParallel(detectCores()-1)
-foreach(i = 1:nrow(mod14_day_counts_025))%dopar%{
-  # counts ==========
-  # day counts
-  system(paste("echo",i))
-  month <- mod14_day_counts_025$month_n[i]
-  year<- mod14_day_counts_025$year[i]
-  
-  counts <- raster::raster(mod14_day_counts_025$value[i])
-  overpasses<- raster::raster(paste0("data/overpass_counts_025/",
-                                     year,"-", 
-                                     str_pad(month, 2, "left", 0),"_",
-                                     "day_overpass-count.tif"))
-  
-  adjusted <- counts/overpasses
-  outfile <- paste0("data/adjusted_counts_025/op-adjusted_D_", 
-                    mod14_day_counts_025$year[i],
-                    str_pad(month, width=2, side="left", pad = "0"),
-                    ".tif"
-  )
-  writeRaster(adjusted,outfile, overwrite=TRUE)  
-  
-  # night counts
-  month_n <- mod14_night_counts_025$month_n[i]
-  
-  counts_n <- raster::raster(mod14_night_counts_025$value[i])
-  overpasses_n <- raster::raster(paste0("data/overpass_counts_025/",
-                                        year,"-", 
-                                        str_pad(month, 2, "left", 0),"_",
-                                        "night_overpass-count.tif"))
-  
-  adjusted_n <- counts_n/overpasses_n
-  outfile_n <- paste0("data/adjusted_counts_025/op-adjusted_N_", 
-                      mod14_night_counts_025$year[i],
-                      str_pad(month, width=2, side="left", pad = "0"),
-                      ".tif"
-  )
-  writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
-  
-  # night fraction
-  if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
-    
-    nf<- adjusted_n/(adjusted+adjusted_n)
-    outfile_nf <- paste0("data/adjusted_counts_025/op-adjusted_NF_", 
-                         mod14_night_counts_025$year[i],
-                         str_pad(month, width=2, side="left", pad = "0"),
-                         ".tif"
-    )
-    writeRaster(nf,outfile_nf, overwrite=TRUE)}
-  rm(month, counts, adjusted, outfile, 
-     month_n, counts_n, adjusted_n, outfile_n)
-  ## FRP ==========
-  # day frp
-  month <- mod14_day_frp_025$month_n[i]
-  
-  counts <- raster::raster(mod14_day_frp_025$value[i])
-
-  adjusted <- counts/overpasses
-  outfile <- paste0("data/adjusted_frp_025/op-adjusted_D_", 
-                    mod14_day_frp_025$year[i],
-                    str_pad(month, width=2, side="left", pad = "0"),
-                    ".tif"
-  )
-  writeRaster(adjusted,outfile, overwrite=TRUE)  
-  
-  # night frp
-  month_n <- mod14_night_frp_025$month_n[i]
-  
-  counts_n <- raster::raster(mod14_night_frp_025$value[i])
-
-  adjusted_n <- counts_n/overpasses_n
-  outfile_n <- paste0("data/adjusted_frp_025/op-adjusted_N_", 
-                      mod14_night_frp_025$year[i],
-                      str_pad(month, width=2, side="left", pad = "0"),
-                      ".tif"
-  )
-  writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
-  
-  # night fraction
-  if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
-    
-    nf<- adjusted_n/(adjusted+adjusted_n)
-    outfile_nf <- paste0("data/adjusted_frp_025/op-adjusted_NF_", 
-                         mod14_night_frp_025$year[i],
-                         str_pad(month, width=2, side="left", pad = "0"),
-                         ".tif"
-    )
-    writeRaster(nf,outfile_nf, overwrite=TRUE)}
-}
-
-# aggregation ==================================================================
-dir.create("out/aggregations_2003-2020")
-
-# getting filenames ============================================================
-adjusted_n <- list.files("data/adjusted_counts_025", 
-                         full.names = TRUE, pattern = "_N_") %>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-adjusted_d <- list.files("data/adjusted_counts_025", 
-                         full.names = TRUE, pattern = "_D_")%>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-adjusted_nf <- list.files("data/adjusted_counts_025", 
-                         full.names = TRUE, pattern = "_NF_") %>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-adjusted_n_frp <- list.files("data/adjusted_frp_025", 
-                             full.names = TRUE, pattern = "_N_") %>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-adjusted_d_frp <- list.files("data/adjusted_frp_025",
-                             full.names = TRUE, pattern = "_D_")%>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-adjusted_nf_frp <- list.files("data/adjusted_frp_025", 
-                             full.names = TRUE, pattern = "_NF_") %>%
-  as_tibble() %>%
-  mutate(year = str_extract(value,"\\d{4}"))
-
-# actually doing the aggregation ===============================================
-
-# this is the stars method which was actually faster... 
-# dc<-adjusted_d %>%
-#   pull(value) %>%
-#   read_stars(along = "band") %>%
-#   st_apply(MARGIN = 1:2, FUN = function(x)sum(x, na.rm = TRUE))
-# 
-# write_stars(dc, 
-#             dsn = paste0("data/aggregations_2003-2020/day_counts.tif"))
-
-# counts =======================================================================
-# day counts
-dcr<-adjusted_d %>%
   pull(value) %>%
   raster::stack()
 
 beginCluster()
-dcrxx <- clusterR(dcr, function(x)sum(x, na.rm=T), verbose=T)
+raw_night_frp_sum <- clusterR(mod14_night_frp_025, 
+                              function(x)sum(x, na.rm=T), verbose=T)
 endCluster()
 
-writeRaster(dcrxx, 
-            filename = "out/aggregations_2003-2020/day_counts_rast.tif",
-            overwrite=T)
-
-# night counts
-ncr<-adjusted_n %>%
-  pull(value) %>%
-  raster::stack()
-
-beginCluster()  
-ncrxx <- clusterR(ncr, function(x)sum(x, na.rm=T), verbose=T)
-endCluster()
-
-writeRaster(ncrxx, 
-            filename = "out/aggregations_2003-2020/night_counts_rast.tif", 
-            overwrite=T)
-
-# night fraction 
-ncfr<- ncrxx/(ncrxx+dcrxx)
-writeRaster(ncfr, 
-            filename = "out/aggregations_2003-2020/night_fraction_rast.tif", 
-            overwrite=T)
-
-# frp ==========================================================================
-# day frp
-dfrp <-adjusted_d_frp %>%
-  pull(value) %>%
-  raster::stack()
-
-beginCluster()
-dfrpxx <- clusterR(dfrp, function(x)sum(x, na.rm=T), verbose=T)
-endCluster()
-
-writeRaster(dfrpxx, 
-            filename = "out/aggregations_2003-2020/day_frp_rast.tif",
-            overwrite=T)
-
-# night frp
-nfrp<- adjusted_n_frp %>%
-  pull(value) %>%
-  raster::stack()
-
-beginCluster()  
-nfrpxx <- clusterR(nfrp, function(x)sum(x, na.rm=T), verbose=T)
-endCluster()
-
-writeRaster(nfrpxx, 
-            filename = "out/aggregations_2003-2020/night_frp_rast.tif", 
-            overwrite=T)
-
-# night fraction
-
-nffrp1<- nfrpxx/(nfrpxx+dfrpxx)
-writeRaster(nffrp1, 
-            filename = "out/aggregations_2003-2020/night_fraction_frp_rast.tif", 
-            overwrite=T)
+writeRaster(raw_night_frp_sum, "out/aggregations_2003-2020/raw_night_frp_sum.tif",
+            overwrite=TRUE)
 
 # shifting the lck layer =======================================================
 
-lckrastsh<-raster::shift(x = lckrast, dx = -179.75, dy = -0.25) %>%
-  writeRaster("out/aggregations_2003-2020/aaalck_shifted.tif")
+raster::shift(x = raster::raster("in/lc_koppen_2010_mode.tif"), dx = -179.75, dy = -0.25) %>%
+  writeRaster("out/aggregations_2003-2020/lck_shifted.tif")
 
 # making the table from the aggregated rasters =================================
-aggregation_tables <- list.files("out/aggregations_2003-2020",
+
+lck_sf<-c(lck_s, d_ovp, n_ovp, 
+          read_stars("out/aggregations_2003-2020/raw_day_counts.tif"),
+          read_stars("out/aggregations_2003-2020/raw_night_counts.tif"),
+                     along = "band") %>% 
+  stars::st_xy2sfc(as_points = FALSE) %>%
+  st_as_sf() %>%
+  mutate(area_km2 = (st_area(.) %>% as.numeric)/1e6) %>%
+  st_set_geometry(NULL)%>%
+  dplyr::rename(lck = lck_shifted.tif.V1, 
+                d_ovp = lck_shifted.tif.V2, 
+                n_ovp = lck_shifted.tif.V3,
+                dc = lck_shifted.tif.V4,
+                nc = lck_shifted.tif.V5) %>%
+  filter(!is.na(lck))%>%
+  mutate(day_afd_per_ovp = 1e6*(dc/d_ovp)/area_km2,
+         night_afd_per_ovp = 1e6*(nc/n_ovp)/area_km2,
+         kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         lc_kop = paste(kop, lc)) %>%
+  left_join(thresholds %>% dplyr::select(-area_km2),
+            ., by = "lc_kop")%>%
+  group_by(lc_kop) %>%
+  summarise(land_area_Mkm2 = sum(area_km2)/1e6,
+            total_day_detections_per_ovp_per_Mkm2 = mean(day_afd_per_ovp, na.rm=T),
+            total_night_detections_per_ovp_per_Mkm2 = mean(night_afd_per_ovp, na.rm=T),
+            pct_night_afd = 100*total_night_detections_per_ovp_per_Mkm2/(total_night_detections_per_ovp_per_Mkm2+total_day_detections_per_ovp_per_Mkm2)) %>%
+  ungroup
+            
+            
+
+final_table <- list.files("out/aggregations_2003-2020",
                                  full.names = TRUE) %>%
-  sort()%>%
   raster::stack() %>%
   as.data.frame() %>%
-  filter(!is.na(aaalck_shifted)) %>%
-  group_by(lck = aaalck_shifted) %>%
-  summarise(day_counts = sum(day_counts_rast, na.rm=TRUE)/216, 
-            night_counts = sum(night_counts_rast, na.rm=TRUE)/216,
-            night_fraction = mean(night_fraction_rast, na.rm=TRUE),
-            day_frp = sum(day_frp_rast, na.rm=TRUE)/216,
-            night_frp = sum(night_frp_rast, na.rm=TRUE)/216,
-            night_fraction_frp = mean(night_fraction_frp_rast, na.rm=TRUE)) %>%
-  ungroup %>%
+  dplyr::select(lck = lck_shifted,
+                raw_day_counts,
+                raw_night_counts,
+                raw_day_frp_sum,
+                raw_night_frp_sum)%>%
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
          lc_kop = paste(kop, lc)) %>%
-  dplyr::select(lc_kop, day_counts, night_counts, night_fraction, 
-                day_frp, night_frp, night_fraction_frp) %>%
-  na.omit()
+  left_join(thresholds %>% dplyr::select(-area_km2),
+                         ., by = "lc_kop")%>%
+  group_by(lc_kop) %>%
+  summarise(sum_day_counts = sum(raw_day_counts, na.rm=T), 
+            sum_night_counts = sum(raw_night_counts, na.rm=T),
+            sum_day_frp = sum(raw_day_frp_sum, na.rm=T),
+            sum_night_frp = sum(raw_night_frp_sum, na.rm=T),
+            millions_of_km2 = first(millions_of_km2),
+            sum_day_ovp = sum(day_ovp),
+            sum_night_ovp= sum(night_ovp)) %>%
+  ungroup  %>%
+  mutate(day_counts_per_ovp_perMkm2 = (sum_day_counts/sum_day_ovp)*millions_of_km2,
+         night_counts_per_ovp_perMkm2 = (sum_night_counts/sum_night_ovp)*millions_of_km2,
+         day_frp_per_ovp_perMkm2 = sum_day_frp/sum_day_ovp*millions_of_km2,
+         night_frp_per_ovp_perMkm2 = sum_night_frp/sum_night_ovp*millions_of_km2,
+         night_count_pct = night_counts_per_ovp_perMkm2/(day_counts_per_ovp_perMkm2+night_counts_per_ovp_perMkm2)*100,
+         night_frp_pct = night_frp_per_ovp_perMkm2/(day_frp_per_ovp_perMkm2+night_frp_per_ovp_perMkm2)*100) %>%
+  dplyr::select(lc_kop, millions_of_km2, 
+                day_counts_per_ovp_perMkm2, night_counts_per_ovp_perMkm2, night_count_pct,
+                day_frp_per_ovp_perMkm2, night_frp_per_ovp_perMkm2, night_frp_pct)
 
-final_table <- left_join(thresholds %>% dplyr::select(-area_km2),
-                         aggregation_tables, by = "lc_kop") %>%
-  mutate(day_counts = day_counts/millions_of_km2,
-         night_counts = night_counts/millions_of_km2,
-         day_frp = day_frp/millions_of_km2,
-         night_frp = night_frp/millions_of_km2,
-         night_fraction = night_fraction*100,
-         night_fraction_frp = night_fraction_frp*100) %>%
-  dplyr::select(lc_kop, millions_of_km2, day_counts, night_counts, night_fraction,
-                day_frp, night_frp, night_fraction_frp)
 
-total_row<- tibble(lc_kop = "total",
-                   millions_of_km2 = sum(final_table$millions_of_km2),
-                   day_counts = sum(final_table$day_counts),
-                   night_counts = sum(final_table$night_counts),
-                   night_fraction = mean(final_table$night_fraction),
-                   day_frp = sum(final_table$day_frp),
-                   night_frp = sum(final_table$night_frp),
-                   night_fraction_frp = mean(final_table$night_fraction_frp))
+# final_final_table<- rbind(final_table, total_row) %>% 
+#   dplyr::mutate_if(is.numeric, sprintf, fmt = "%.1f")
 
-final_final_table<- rbind(final_table, total_row) %>% 
-  dplyr::mutate_if(is.numeric, sprintf, fmt = "%.1f")
-
-write_csv(final_final_table,"out/table_s1.csv")
+# write_csv(final_final_table,"out/table_s1.csv")
