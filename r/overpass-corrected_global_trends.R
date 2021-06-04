@@ -6,6 +6,7 @@ library(sf)
 library(raster)
 library(tidyverse)
 library(lubridate)
+library(stars)
 library(mblm)
 library(terra)
 library(doParallel)
@@ -264,6 +265,16 @@ day_counts <- list.files("data/annual_adjusted_counts",
 
 dir.create("out")
 
+dc_area <- read_stars("data/annual_adjusted_counts/day_adj_annual_counts_2003.tif") %>% 
+  stars::st_xy2sfc(as_points = FALSE) %>%
+  st_as_sf() %>%
+  mutate(area_km2 = (st_area(.)/1000000)%>% as.numeric) %>%
+  st_centroid() %>%
+  mutate(lat = st_coordinates(.)[,2])%>%
+  st_set_geometry(NULL) %>%
+  dplyr::select(area_km2, lat) %>%
+  unique()
+
 # 1 degree
 day_counts_df <- day_counts %>%
   as.data.frame(xy=TRUE, cells=TRUE) %>%
@@ -280,8 +291,11 @@ day_counts_trends<-parallel_theilsen(day_counts_df,
                                      zero_to_na = FALSE, 
                                      pb=TRUE,
                                      workers=4,
-                                     minimum_sample = 10)
+                                     minimum_sample = 10) %>%
+  left_join(dc_area,by=c("y"="lat"))
+
 save(day_counts_trends, file = "data/day_counts_trends.Rda")
+
 p_dc<-ggplot(day_counts_trends %>% filter(p<0.05) %>% 
          mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
   geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
@@ -313,7 +327,8 @@ night_counts_df<-night_counts %>%
 night_counts_trends<-parallel_theilsen(night_counts_df,
                                        zero_to_na = FALSE, 
                                        workers=4,
-                                       minimum_sample = 10)
+                                       minimum_sample = 10)%>%
+  left_join(dc_area,by=c("y"="lat"))
 
 p_nc<-ggplot(night_counts_trends %>% filter(p<0.05) %>% 
          mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
@@ -326,6 +341,8 @@ p_nc<-ggplot(night_counts_trends %>% filter(p<0.05) %>%
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/night_count_trend_1_deg_2003-2018.png")
+
+save(night_counts_trends, file = "night_counts_trends.Rda")
 
 ## annual night fraction ===========
 night_fractions <- list.files("data/annual_adjusted_counts", pattern = "night_fraction", full.names = TRUE) %>%
@@ -344,7 +361,8 @@ night_fraction_df<-night_fractions%>%
 night_fraction_trends<-parallel_theilsen(night_fraction_df,
                                        zero_to_na = FALSE, 
                                        workers=4,
-                                       minimum_sample = 10)
+                                       minimum_sample = 10)%>%
+  left_join(dc_area,by=c("y"="lat"))
 
 p_nf<-ggplot(night_fraction_trends %>% filter(p<0.05) %>% 
          mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
@@ -356,7 +374,7 @@ p_nf<-ggplot(night_fraction_trends %>% filter(p<0.05) %>%
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/night_fraction_trend_1_deg_2003-2018.png")
-
+save(night_fraction_trends,file="night_fraction_trends.Rda")
 ## annual night frp mean =======================================================
 
 night_frp <- list.files("data/annual_adjusted_counts", 
@@ -379,7 +397,8 @@ night_frp_df<-night_frp %>%
 night_frp_trends<-parallel_theilsen(night_frp_df,
                                     zero_to_na = TRUE,
                                     workers=4, 
-                                    minimum_sample = 10)
+                                    minimum_sample = 10)%>%
+  left_join(dc_area,by=c("y"="lat"))
 
 p_frp <- ggplot(night_frp_trends %>% filter(p<0.05) %>% 
          mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
@@ -392,6 +411,8 @@ p_frp <- ggplot(night_frp_trends %>% filter(p<0.05) %>%
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/night_frp_trend_1_deg_2003-2018.png")
+
+save(night_frp_trends, file = "night_frp_mean_trends.Rda")
 
 ## annual night frp total ======================================================
 
@@ -414,7 +435,8 @@ adj_night_frp_df<-night_frp_mw_per_ovp %>%
 
 adj_night_frp_trends<-parallel_theilsen(adj_night_frp_df,
                                     zero_to_na = FALSE,
-                                    workers=4, minimum_sample = 10)
+                                    workers=4, minimum_sample = 10)%>%
+  left_join(dc_area,by=c("y"="lat"))
 
 p_adj_frp <- ggplot(adj_night_frp_trends %>% filter(p<0.05) %>% 
                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
@@ -428,11 +450,32 @@ p_adj_frp <- ggplot(adj_night_frp_trends %>% filter(p<0.05) %>%
         legend.justification = c(0,0)) +
   ggsave("out/adjusted_total_night_frp_trend_1_deg_2003-2018.png")
 
+save(adj_night_frp_trends, file = "night_frp_total_trends.Rda")
+
 # all together
 library(ggpubr)
 ggarrange(p_dc, p_nc, p_nf, p_adj_frp, nrow = 2, ncol=2) +
   ggsave(height = 7, width=12, filename = "out/annual_4pan.png")
 
+# table of trends per area
+
+bind_rows("daytime_afd"=day_counts_trends, 
+          "nighttime_afd"= night_counts_trends, 
+          "percent_nighttime_afd"= night_fraction_trends,
+          "frp_MW_per_afd"=night_frp_trends, 
+          "frp_MW_per_overpass"=adj_night_frp_trends, .id="id")%>%
+  filter(p<0.05) %>% 
+  mutate(Trend = ifelse(beta > 0, "positive", "negative")) %>%
+  group_by(Trend, id) %>%
+  summarise(area_Mkm2 = sum(area_km2)/1e6) %>%
+  ungroup %>%
+  pivot_wider(names_from = "id", values_from = area_Mkm2,
+              names_glue = "{id}_Mkm2") %>%
+  dplyr::select(Trend, daytime_afd_Mkm2, nighttime_afd_Mkm2, 
+                percent_nighttime_afd_Mkm2,
+                frp_MW_per_afd_Mkm2,frp_MW_per_overpass_Mkm2) %>%
+  write_csv("out/land_area_trends.csv")
+  
 
 # TIME SERIES BY LANDCOVER TYPE ================================================
 # koppen look up tables=========================================================
@@ -490,17 +533,44 @@ day_counts_lc_df <- c(lck_shifted, day_counts) %>%
          lc = lut_lc[str_sub(lck,2,3)],
          cell = paste(kop, lc)) %>% # calling it cell for the function
   na.omit %>%
-  filter(cell %in% burnable_lcs) %>%
   group_by(cell, timestep) %>%
   summarise(value = mean(value)) %>%
-  ungroup()
+  ungroup() %>%
+  filter(cell %in% burnable_lcs)
 
 day_counts_trends_lc<-parallel_theilsen_lc(day_counts_lc_df,
                                      zero_to_na = FALSE, 
                                      pb=TRUE,
                                      workers=4,
                                      minimum_sample = 10)
-save(day_counts_trends_lc, file = "data/day_counts_trends_lc.Rda")
+
+day_counts_global_df <- c(lck_shifted, day_counts) %>%
+  as.data.frame() %>%
+  dplyr::rename(lck = lc_koppen_2010_mode) %>%
+  mutate(lck = as.character(lck)) %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         cell = paste(kop, lc))  %>%
+  filter(cell %in% burnable_lcs)%>% 
+  dplyr::select(-lc,-kop, -cell) %>%
+  pivot_longer(cols = names(.)[2:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  replace_na(list(timestep = 1)) %>% # calling it cell for the function
+  na.omit %>%
+  group_by(timestep) %>%
+  summarise(value = mean(value)) %>%
+  ungroup()
+
+global_d<-mblm(value~timestep, day_counts_global_df) %>% summary()
+dctlc<- bind_rows(day_counts_trends_lc,
+          tibble(cell = "Global",
+                 p = global_d$coefficients[2,4],
+                 beta = global_d$coefficients[2,1],
+                 n = nrow(day_counts_global_df)))
+
+save(dctlc, file = "data/day_counts_trends_lc.Rda")
 
 # night counts =================================================================
 night_counts <- list.files("data/annual_adjusted_counts", 
@@ -534,7 +604,34 @@ night_counts_trends_lc<-parallel_theilsen_lc(night_counts_lc_df,
                                         pb=TRUE,
                                         workers=4,
                                         minimum_sample = 10)
-save(night_counts_trends_lc,file= "data/night_counts_trends_lc.Rda")
+
+night_counts_global_df <- c(lck_shifted, night_counts) %>%
+  as.data.frame() %>%
+  dplyr::rename(lck = lc_koppen_2010_mode) %>%
+  mutate(lck = as.character(lck)) %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         cell = paste(kop, lc))  %>%
+  filter(cell %in% burnable_lcs)%>% 
+  dplyr::select(-lc,-kop, -cell) %>%
+  pivot_longer(cols = names(.)[2:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  replace_na(list(timestep = 1)) %>% # calling it cell for the function
+  na.omit %>%
+  group_by(timestep) %>%
+  summarise(value = mean(value)) %>%
+  ungroup()
+
+global_n<-mblm(value~timestep, night_counts_global_df) %>% summary()
+nctlc<- bind_rows(night_counts_trends_lc,
+                  tibble(cell = "Global",
+                         p = global_n$coefficients[2,4],
+                         beta = global_n$coefficients[2,1],
+                         n = nrow(night_counts_global_df)))
+
+save(nctlc, file = "data/night_counts_trends_lc.Rda")
 
 # night_fraction ===============================================================
 
@@ -569,7 +666,33 @@ percent_night_afd_trends_lc<-parallel_theilsen_lc(percent_night_afd_lc_df,
                                           pb=TRUE,
                                           workers=4,
                                           minimum_sample = 10)
-save(percent_night_afd_trends_lc,file= "data/night_fraction_trends_lc.Rda")
+percent_night_afd_global_df <- c(lck_shifted, night_fraction) %>%
+  as.data.frame() %>%
+  dplyr::rename(lck = lc_koppen_2010_mode) %>%
+  mutate(lck = as.character(lck)) %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         cell = paste(kop, lc))  %>%
+  filter(cell %in% burnable_lcs)%>% 
+  dplyr::select(-lc,-kop, -cell) %>%
+  pivot_longer(cols = names(.)[2:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  replace_na(list(timestep = 1)) %>% # calling it cell for the function
+  na.omit %>%
+  group_by(timestep) %>%
+  summarise(value = mean(value)*100) %>%
+  ungroup()
+
+global_nf<-mblm(value~timestep, percent_night_afd_global_df) %>% summary()
+nfctlc<- bind_rows(percent_night_afd_trends_lc,
+                  tibble(cell = "Global",
+                         p = global_nf$coefficients[2,4],
+                         beta = global_nf$coefficients[2,1],
+                         n = nrow(percent_night_afd_global_df)))
+
+save(nfctlc, file = "data/percent_night_afd_trends_lc.Rda")
 
 # night frp ====================================================================
 night_frp_mean <- list.files("data/annual_adjusted_counts", 
@@ -604,7 +727,33 @@ night_frp_mean_trends_lc<-parallel_theilsen_lc(night_frp_mean_lc_df,
                                             workers=4,
                                             minimum_sample = 10)
 
-save(night_frp_mean_trends_lc,file= "data/night_frp_mean_trends_lc.Rda")
+night_frp_mean_global_df <- c(lck_shifted, night_frp_mean) %>%
+  as.data.frame() %>%
+  dplyr::rename(lck = lc_koppen_2010_mode) %>%
+  mutate(lck = as.character(lck)) %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         cell = paste(kop, lc))  %>%
+  filter(cell %in% burnable_lcs)%>% 
+  dplyr::select(-lc,-kop, -cell) %>%
+  pivot_longer(cols = names(.)[2:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  replace_na(list(timestep = 1)) %>% # calling it cell for the function
+  na.omit %>%
+  group_by(timestep) %>%
+  summarise(value = mean(value)) %>%
+  ungroup()
+
+global_nfrpm<-mblm(value~timestep, night_frp_mean_global_df) %>% summary()
+nfrpmtlc<- bind_rows(night_frp_mean_trends_lc,
+                     tibble(cell = "Global",
+                            p = global_nfrpm$coefficients[2,4],
+                            beta = global_nfrpm$coefficients[2,1],
+                            n = nrow(night_frp_mean_global_df)))
+
+save(nfrpmtlc, file = "data/night_frp_mean_trends_lc.Rda")
 
 # night frp adjusted ===========================================================
 night_frp_total <- list.files("data/annual_adjusted_counts", 
@@ -639,22 +788,48 @@ night_frp_total_trends_lc<-parallel_theilsen_lc(night_frp_total_lc_df,
                                                 workers=4,
                                                 minimum_sample = 10)
 
-save(night_frp_total_trends_lc,file= "data/night_frp_total_trends_lc.Rda")
+night_frp_total_global_df <- c(lck_shifted, night_frp_total) %>%
+  as.data.frame() %>%
+  dplyr::rename(lck = lc_koppen_2010_mode) %>%
+  mutate(lck = as.character(lck)) %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         cell = paste(kop, lc))  %>%
+  filter(cell %in% burnable_lcs)%>% 
+  dplyr::select(-lc,-kop, -cell) %>%
+  pivot_longer(cols = names(.)[2:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  replace_na(list(timestep = 1)) %>% # calling it cell for the function
+  na.omit %>%
+  group_by(timestep) %>%
+  summarise(value = mean(value)) %>%
+  ungroup()
+
+global_nfrpt<-mblm(value~timestep, night_frp_total_global_df) %>% summary()
+nfrpttlc<- bind_rows(night_frp_total_trends_lc,
+                  tibble(cell = "Global",
+                         p = global_nfrpt$coefficients[2,4],
+                         beta = global_nfrpt$coefficients[2,1],
+                         n = nrow(night_frp_total_global_df)))
+
+save(nfrpttlc, file = "data/night_frp_total_trends_lc.Rda")
 
 # making a table of lc trends ==================================================
 
 list.files("data", pattern = "lc.Rda", full.names = TRUE) %>%
   lapply(load)
 
-trends_table <- bind_rows(list(day_counts_trends_lc %>% 
+trends_table <- bind_rows(list(dctlc %>% 
                                  mutate(variable = "day_afd_per_ovp"),
-                               night_counts_trends_lc %>% 
+                               nctlc %>% 
                                  mutate(variable = "night_afd_per_ovp"),
-                               percent_night_afd_trends_lc %>% 
+                               nfctlc %>% 
                                  mutate(variable = "percent_night_afd"),
-                               night_frp_total_trends_lc %>%
+                               nfrpttlc %>%
                                  mutate(variable = "night_frp_MW_per_ovp"),
-                               night_frp_mean_trends_lc %>% 
+                               nfrpmtlc %>% 
                                  mutate(variable = "night_frp_MW_per_afd"))) %>%
   dplyr::select(-n) %>%
   dplyr::mutate(p = ifelse(p<0.05, "*", ""),
@@ -667,12 +842,11 @@ trends_table <- bind_rows(list(day_counts_trends_lc %>%
               values_from = "beta") %>%
   na.omit() %>%
   dplyr::rename(landcover = cell) %>%
+  mutate(landcover = replace(landcover, landcover == "Global", "zGlobal")) %>%
   arrange(landcover)
   
 write_csv(trends_table, "out/annual_trends_by_lc.csv")
 # MONTHLY ======================================================================
-
-workers<- detectCores()/2
 ## day counts ===========
 dc_m <- list.files("data/adjusted_counts",
                           pattern = "_D_", full.names = TRUE)%>%
