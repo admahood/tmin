@@ -710,7 +710,7 @@ night_frp_mean_lc_df <- c(lck_shifted, night_frp_mean) %>%
   pivot_longer(cols = names(.)[5:ncol(.)],
                names_to = "layer", 
                values_to = "value") %>%
-  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  mutate(timestep = 1+(str_sub(layer,6,7) %>% as.numeric)) %>%
   replace_na(list(timestep = 1)) %>%
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
@@ -739,7 +739,7 @@ night_frp_mean_global_df <- c(lck_shifted, night_frp_mean) %>%
   pivot_longer(cols = names(.)[2:ncol(.)],
                names_to = "layer", 
                values_to = "value") %>%
-  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  mutate(timestep = 1+(str_sub(layer,6,7) %>% as.numeric)) %>%
   replace_na(list(timestep = 1)) %>% # calling it cell for the function
   na.omit %>%
   group_by(timestep) %>%
@@ -754,6 +754,10 @@ nfrpmtlc<- bind_rows(night_frp_mean_trends_lc,
                             n = nrow(night_frp_mean_global_df)))
 
 save(nfrpmtlc, file = "data/night_frp_mean_trends_lc.Rda")
+night_frp_mean_global_df %>% 
+  mutate(year = timestep+2003) %>%
+  write_csv("data/global_yearly_means_night_frp_per_afd.csv")
+
 
 # night frp adjusted ===========================================================
 night_frp_total <- list.files("data/annual_adjusted_counts", 
@@ -771,7 +775,7 @@ night_frp_total_lc_df <- c(lck_shifted, night_frp_total) %>%
   pivot_longer(cols = names(.)[5:ncol(.)],
                names_to = "layer", 
                values_to = "value") %>%
-  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  mutate(timestep = 1+(str_sub(layer,6,7) %>% as.numeric)) %>%
   replace_na(list(timestep = 1)) %>%
   mutate(kop = lut_kop[str_sub(lck,1,1)],
          lc = lut_lc[str_sub(lck,2,3)],
@@ -800,7 +804,7 @@ night_frp_total_global_df <- c(lck_shifted, night_frp_total) %>%
   pivot_longer(cols = names(.)[2:ncol(.)],
                names_to = "layer", 
                values_to = "value") %>%
-  mutate(timestep = 1+(str_sub(layer,5,6) %>% as.numeric)) %>%
+  mutate(timestep = 1+(str_sub(layer,6,7) %>% as.numeric)) %>%
   replace_na(list(timestep = 1)) %>% # calling it cell for the function
   na.omit %>%
   group_by(timestep) %>%
@@ -815,7 +819,9 @@ nfrpttlc<- bind_rows(night_frp_total_trends_lc,
                          n = nrow(night_frp_total_global_df)))
 
 save(nfrpttlc, file = "data/night_frp_total_trends_lc.Rda")
-
+night_frp_total_global_df %>% 
+  mutate(year = timestep+2003) %>%
+  write_csv("data/global_yearly_means_night_frp_per_overpass.csv")
 # making a table of lc trends ==================================================
 
 list.files("data", pattern = "lc.Rda", full.names = TRUE) %>%
