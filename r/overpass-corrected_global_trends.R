@@ -634,10 +634,10 @@ night_frp_total_lc_df <- c(lck_shifted, night_frp_total) %>%
   ungroup()
 
 night_frp_total_trends_lc<-parallel_theilsen_lc(night_frp_total_lc_df,
-                                            zero_to_na = FALSE, 
-                                            pb=TRUE,
-                                            workers=4,
-                                            minimum_sample = 10)
+                                                zero_to_na = FALSE, 
+                                                pb=TRUE,
+                                                workers=4,
+                                                minimum_sample = 10)
 
 save(night_frp_total_trends_lc,file= "data/night_frp_total_trends_lc.Rda")
 
