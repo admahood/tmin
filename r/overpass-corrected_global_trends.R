@@ -852,6 +852,18 @@ trends_table <- bind_rows(list(dctlc %>%
   arrange(landcover)
   
 write_csv(trends_table, "out/annual_trends_by_lc.csv")
+
+# table of yearly means ========================================================
+
+yearly_means<-bind_rows("day_afd_per_ovp"=day_counts_global_df,
+          "night_afd_per_ovp"=night_counts_global_df,
+          "percent_night_afd"=percent_night_afd_global_df,
+          'night_frp_MW_per_afd'=night_frp_mean_global_df,
+          'night_frp_MW_per_ovp'=night_frp_total_global_df,
+          .id = "id") %>%
+  mutate(timestep = timestep + 2002) %>%
+  pivot_wider(names_from = "id", values_from = value)
+write_csv(yearly_means, "out/yearly_means.csv")
 # MONTHLY ======================================================================
 ## day counts ===========
 dc_m <- list.files("data/adjusted_counts",
