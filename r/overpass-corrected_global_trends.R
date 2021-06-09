@@ -11,6 +11,7 @@ library(mblm)
 library(terra)
 library(doParallel)
 library(foreach)
+library(mgcv)
 
 # thresholds ===================================================================
 thresholds <- read_csv("data/updated-goes-af-vpd-thresholds.csv")
@@ -864,190 +865,54 @@ yearly_means<-bind_rows("day_afd_per_ovp"=day_counts_global_df,
   mutate(timestep = timestep + 2002) %>%
   pivot_wider(names_from = "id", values_from = value)
 write_csv(yearly_means, "out/yearly_means.csv")
-# MONTHLY ======================================================================
-## day counts ===========
-dc_m <- list.files("data/adjusted_counts",
-                          pattern = "_D_", full.names = TRUE)%>%
-  as_tibble  %>%
-  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
-         year = str_sub(ym, 1,4),
-         month = str_sub(ym, 5,6)) %>%
-  filter(year > 2002) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
-         month_n = lubridate::month(date)) %>%
-  dplyr::arrange(date)
+# MONTHLY GLOBAL ===============================================================
+wide_df<-read_csv("data/mcd14ml-global-trend-by-month_wide.csv") %>%
+  mutate(percent_n_night = prop_n_night*100)%>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, time2 = min(year_month), units = "days")))
 
-dc_stack_m<-terra::rast(pull(dc_m, value))
-
-dc_df_m <- dc_stack_m  %>%
-  as.data.frame(xy=TRUE, cells=TRUE) %>%
-  mutate(rsum = rowSums(.[4:ncol(.)])) %>%
-  filter(rsum>0) %>%
-  dplyr::select(-rsum) %>%
-  pivot_longer(cols = names(.)[4:ncol(.)],names_to = "layer", values_to = "value")  %>%
-  mutate(ym = str_extract(layer, "\\d{6}") %>% as.numeric,
-         year = str_sub(ym, 1,4),
-         month = str_sub(ym, 5,6)) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d")) %>%
-  dplyr::arrange(cell,date) %>%
-  group_by(cell) %>%
-  mutate(timestep = row_number()) %>%
-  ungroup()
+frp_df <- read_csv("data/mcd14ml-global-trend-by-month.csv") %>%
+  dplyr::select(year_month, dn_detect, mean_frp_per_detection, acq_month, acq_year) %>%
+  filter(dn_detect == "night")%>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")))
 
 
-workers=4
-dc_trends_m<-parallel_theilsen(dc_df_m, pb=TRUE,
-                                      zero_to_na = FALSE,
-                                      workers=workers, 
-                                      minimum_sample = 30)
+day_ts<-mblm(day~time, data=wide_df);summary(day_ts)
+night_ts<-mblm(night~time, data=wide_df);summary(night_ts)
+nf_ts <-mblm(percent_n_night~time, data=wide_df);summary(nf_ts)
+frp_ts <-mblm(mean_frp_per_detection~time, data=frp_df);summary(frp_ts)
 
-p_dc_m <- ggplot(dc_trends_m %>% 
-                  filter(p<0.05->alpha) %>% 
-                  mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
-  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
-  geom_raster(aes(x=x,y=y,fill=Trend)) +
-  scale_fill_manual(values = c("blue","red"))+
-  theme_void()+
-  ggtitle(paste("Monthly daytime detections, 1 degree, 2003-2020, p<0.05"))+
-  theme(legend.position = c(0.1,0.2),
-        legend.justification = c(0,0)) +
-  ggsave("out/monthly_day_count_trend_1_deg_2003-2020.png")
+# https://fromthebottomoftheheap.net/2014/05/09/modelling-seasonal-data-with-gam/
+nf_gam <- gamm(percent_n_night ~ 
+                 s(acq_month, bs = "cc", k = 12) + 
+                 s(time), 
+               data = wide_df)
+day_gam <- gamm(day ~
+                  s(acq_month, bs = "cc", k = 12) + 
+                  s(time), 
+                data = wide_df);summary(night_gam$gam)
+night_gam <- gamm(night ~
+                    s(acq_month, bs = "cc", k = 12) + 
+                    s(time), 
+                  data = wide_df);summary(day_gam$gam)
+night_frp_gam <- gamm(mean_frp_per_detection ~ 
+                        s(acq_month, bs = "cc", k = 12) + 
+                        s(time), 
+                      data = frp_df);summary(night_frp_gam$gam)
 
-## night counts ===========
-nc_m <- list.files("data/adjusted_counts",
-                   pattern = "_N_", full.names = TRUE)%>%
-  as_tibble  %>%
-  mutate(ym = str_extract(value, "\\d{6}") %>% as.numeric,
-         year = str_sub(ym, 1,4),
-         month = str_sub(ym, 5,6)) %>%
-  filter(year > 2002) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d"),
-         month_n = lubridate::month(date)) %>%
-  dplyr::arrange(date)
+plot(day_gam$lme)
+plot(day_gam$gam)
+plot(night_gam$lme)
+plot(night_gam$gam)
+plot(nf_gam$lme)
+plot(nf_gam$gam)
+plot(night_frp_gam$lme)
+plot(night_frp_gam$gam)
+summary(night_gam$lme)
+summary(night_gam$gam)
 
-nc_stack_m<- terra::rast(pull(nc_m, value))
-
-nc_df_m <- nc_stack_m  %>%
-  as.data.frame(xy=TRUE, cells=TRUE) %>%
-  mutate(rsum = rowSums(.[4:ncol(.)])) %>%
-  filter(rsum>0) %>%
-  dplyr::select(-rsum) %>%
-  pivot_longer(cols = names(.)[4:ncol(.)],names_to = "layer", values_to = "value")  %>%
-  mutate(ym = str_extract(layer, "\\d{6}") %>% as.numeric,
-         year = str_sub(ym, 1,4),
-         month = str_sub(ym, 5,6)) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d")) %>%
-  dplyr::arrange(cell,date) %>%
-  group_by(cell) %>%
-  mutate(timestep = row_number()) %>%
-  ungroup()
-
-nc_trends_m<-parallel_theilsen(nc_df_m, pb=TRUE,
-                               zero_to_na = FALSE,
-                               workers=workers, 
-                               minimum_sample = 30)
-
-p_nc_m <- ggplot(nc_trends_m %>% 
-                   filter(p<0.05->alpha) %>% 
-                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
-  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
-  geom_raster(aes(x=x,y=y,fill=Trend)) +
-  scale_fill_manual(values = c("blue","red"))+
-  theme_void()+
-  ggtitle(paste("Monthly nighttime detections, 1 degree, 2003-2020, p<0.05"))+
-  theme(legend.position = c(0.1,0.2),
-        legend.justification = c(0,0)) +
-  ggsave("out/monthly_night_count_trend_1_deg_2003-2020.png")
-
-## night fraction ===========
-nf_df_m <- list.files("data/adjusted_counts",
-                   pattern = "_NF_", full.names = TRUE)%>%
-  terra::rast() %>%
-  as.data.frame(xy=TRUE, cells=TRUE) %>%
-  # mutate(rsum = rowSums(.[4:ncol(.)])) %>%
-  # filter(rsum>0) %>%
-  # dplyr::select(-rsum) %>%
-  pivot_longer(cols = names(.)[4:ncol(.)],names_to = "layer", values_to = "value")  %>%
-  mutate(ym = str_extract(layer, "\\d{6}") %>% as.numeric,
-         year = str_sub(ym, 1,4),
-         month = str_sub(ym, 5,6)) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%m-%d")) %>%
-  dplyr::arrange(cell,date) %>%
-  group_by(cell) %>%
-  mutate(timestep = row_number()) %>%
-  ungroup()
-
-nf_trends_m<-parallel_theilsen(nf_df_m, pb=TRUE,
-                               zero_to_na = FALSE,
-                               workers=workers, 
-                               minimum_sample = 30)
-
-p_nf_m <- ggplot(nf_trends_m %>% 
-                   filter(p<0.05->alpha) %>% 
-                   mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
-  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
-  geom_raster(aes(x=x,y=y,fill=Trend)) +
-  scale_fill_manual(values = c("blue","red"))+
-  theme_void()+
-  ggtitle(paste("Monthly fraction of nighttime detections, 1 degree, 2003-2020, p<0.05"))+
-  theme(legend.position = c(0.1,0.2),
-        legend.justification = c(0,0)) +
-  ggsave("out/monthly_night_fraction_trend_1_deg_2003-2020.png")
-
-## night frp ===========
-# need to get the files in the correct order
-night_frp_m <- list.files("data/gridded_mod14/FRP_mean",
-                          pattern = "_N_", full.names = TRUE)%>%
-  as_tibble  %>%
-  mutate(year = str_extract(value, "\\d{4}") %>% as.numeric) %>%
-  filter(year > 2002) %>%
-  tidyr::separate(value, sep = "_",
-           into = c("g1", "g2","g3","g4","g5","g7","month","g6"), 
-           remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date)) %>%
-  dplyr::arrange(date)
-
-night_frp_stack_m <- terra::rast(pull(night_frp_m, value))
-
-night_frp_df_m <- night_frp_stack_m %>%
-  as.data.frame(xy=TRUE, cells=TRUE) %>%
-  mutate(rsum = rowSums(.[4:ncol(.)])) %>%
-  filter(rsum>0) %>%
-  dplyr::select(-rsum) %>%
-  pivot_longer(cols = names(.)[4:ncol(.)],names_to = "layer", values_to = "value")%>%
-  tidyr::separate(layer, sep = "_",
-                  into = c("g1", "g2","g3","g4","month","g6"), 
-                  remove = FALSE) %>%
-  dplyr::select(-starts_with("g")) %>%
-  mutate(date = as.Date(paste(year, month, "01", sep="-"), "%Y-%B-%d"),
-         month_n = lubridate::month(date))%>%
-  dplyr::arrange(cell,date) %>%
-  group_by(cell) %>%
-  mutate(timestep = row_number()) %>%
-  ungroup() %>%
-  filter(value>0)
-
-night_frp_trends_m <- parallel_theilsen(night_frp_df_m,
-                                      zero_to_na = TRUE,
-                                      workers=workers, 
-                                      minimum_sample = 30)
-
-p_frp_m <- ggplot(night_frp_trends_m %>% 
-                  filter(p<0.05->alpha) %>% 
-                  mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
-  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
-  geom_raster(aes(x=x,y=y,fill=Trend)) +
-  scale_fill_manual(values = c("blue","red"))+
-  theme_void()+
-  ggtitle(paste("Monthly nighttime FRP, 1 degree, 2003-2020, p<0.05"))+
-  theme(legend.position = c(0.1,0.2),
-        legend.justification = c(0,0)) +
-  ggsave("out/night_frp_trend_1_deg_2003-2020.png")
-
-
-# 4pan
-library(ggpubr)
-ggarrange(p_dc_m, p_nc_m, p_nf_m, p_frp_m) +
-  ggsave(filename = "out/monthly_4pan.png", height = 7, width = 12)
+layout(matrix(1:2, ncol = 2))
+acf(resid(nf_gam$lme), lag.max = 36, main = "ACF")
+pacf(resid(nf_gam$lme), lag.max = 36, main = "pACF")
+layout(1)
