@@ -56,7 +56,8 @@ parallel_theilsen_lc <- function(stack_df, zero_to_na=FALSE, pb =TRUE,
   registerDoParallel(workers)
   result<-foreach(i = cells, .combine = bind_rows)%dopar%{
     
-    dd<-filter(stack_df, cell==i) 
+    dd<-filter(stack_df, cell==i) %>%
+      replace_na(list(value = 0))
     
     if(zero_to_na) dd<-dd %>% filter(value>0)
     
@@ -870,49 +871,206 @@ wide_df<-read_csv("data/mcd14ml-global-trend-by-month_wide.csv") %>%
   mutate(percent_n_night = prop_n_night*100)%>%
   dplyr::mutate(time = as.numeric(difftime(time1 = year_month, time2 = min(year_month), units = "days")))
 
-frp_df <- read_csv("data/mcd14ml-global-trend-by-month.csv") %>%
-  dplyr::select(year_month, dn_detect, mean_frp_per_detection, acq_month, acq_year) %>%
+long_df <- read_csv("data/mcd14ml-global-trend-by-month.csv") 
+
+
+day_afd_ts <- long_df %>%
+  filter(dn_detect == "day")%>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days"))) %>%
+  mblm(n_per_op_per_Mkm2~time, data=.);summary(day_afd_ts)
+
+
+night_afd_ts<-long_df %>%
   filter(dn_detect == "night")%>%
   dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
                                            time2 = min(year_month), 
-                                           units = "days")))
+                                           units = "days"))) %>%
+  mblm(n_per_op_per_Mkm2~time, data=.);summary(night_afd_ts)
 
-
-day_ts<-mblm(day~time, data=wide_df);summary(day_ts)
-night_ts<-mblm(night~time, data=wide_df);summary(night_ts)
 nf_ts <-mblm(percent_n_night~time, data=wide_df);summary(nf_ts)
-frp_ts <-mblm(mean_frp_per_detection~time, data=frp_df);summary(frp_ts)
+
+frp_ts <- long_df %>%
+  filter(dn_detect == "night") %>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days"))) %>%
+  mblm(mean_frp_per_detection~time, data=.);summary(frp_ts)
+
+bind_rows(day_afd_ts, night_afd_ts, nf_ts, frp_ts)-> global_trends
+
 
 # https://fromthebottomoftheheap.net/2014/05/09/modelling-seasonal-data-with-gam/
 nf_gam <- gamm(percent_n_night ~ 
                  s(acq_month, bs = "cc", k = 12) + 
-                 s(time), 
+                 s(time),
+               correlation = corAR1(form = ~ time),
                data = wide_df)
-day_gam <- gamm(day ~
-                  s(acq_month, bs = "cc", k = 12) + 
-                  s(time), 
-                data = wide_df);summary(night_gam$gam)
-night_gam <- gamm(night ~
-                    s(acq_month, bs = "cc", k = 12) + 
-                    s(time), 
-                  data = wide_df);summary(day_gam$gam)
-night_frp_gam <- gamm(mean_frp_per_detection ~ 
-                        s(acq_month, bs = "cc", k = 12) + 
-                        s(time), 
-                      data = frp_df);summary(night_frp_gam$gam)
-
-plot(day_gam$lme)
-plot(day_gam$gam)
-plot(night_gam$lme)
-plot(night_gam$gam)
 plot(nf_gam$lme)
 plot(nf_gam$gam)
-plot(night_frp_gam$lme)
-plot(night_frp_gam$gam)
+summary(nf_gam$lme)
+summary(nf_gam$gam)
+
+day_gam <- long_df %>%
+  filter(dn_detect == "day")%>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")))%>%
+  gamm(n_per_op_per_Mkm2 ~
+                  s(acq_month, bs = "cc", k = 12) + 
+                  s(time),
+       correlation = corCAR1(form = ~ time), 
+                data = .)
+plot(day_gam$lme)
+plot(day_gam$gam)
+summary(day_gam$lme)
+summary(day_gam$gam)
+
+night_gam <- long_df %>%
+  filter(dn_detect == "night")%>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")))%>%
+  gamm(n_per_op_per_Mkm2 ~
+         s(acq_month, bs = "cc", k = 12) + 
+         s(time),
+       correlation = corAR1(form = ~ time), 
+       data = .)
+plot(night_gam$lme)
+plot(night_gam$gam)
 summary(night_gam$lme)
 summary(night_gam$gam)
+
+night_frp_gam <- long_df %>%
+  filter(dn_detect == "night") %>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")))%>%
+  gamm(mean_frp_per_detection ~ 
+                        s(acq_month, bs = "cc", k = 12) + 
+                        s(time),
+       correlation = corAR1(form = ~ time), 
+                      data = .)
+
+plot(night_frp_gam$lme)
+plot(night_frp_gam$gam)
+summary(night_frp_gam$lme)
+summary(night_frp_gam$gam)
 
 layout(matrix(1:2, ncol = 2))
 acf(resid(nf_gam$lme), lag.max = 36, main = "ACF")
 pacf(resid(nf_gam$lme), lag.max = 36, main = "pACF")
 layout(1)
+
+# MONTHLY by Koppen=============================================================
+
+lut_kop<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
+names(lut_kop) <- c(1,2,3,4,5)
+
+bind_rows(
+koppen_percent_n_night <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen_wide.csv") %>%
+  mutate(value = prop_n_night*100)%>%
+  dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")),
+                cell = lut_kop[koppen])%>%
+  parallel_theilsen_lc() %>%
+  mutate(variable = "percent_afd_night")
+,
+koppen_day_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+  filter(dn_detect == "day")%>%
+  dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days")),
+                cell = lut_kop[koppen]) %>%
+  dplyr::rename(value = n_per_op_per_Mkm2)%>%
+  parallel_theilsen_lc() %>%
+  mutate(variable = "day_afd_per_op_per_Mkm2")
+,
+koppen_night_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+  filter(dn_detect == "night")%>%
+  dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                               time2 = min(year_month), 
+                                               units = "days")),
+                cell = lut_kop[koppen]) %>%
+  dplyr::rename(value = n_per_op_per_Mkm2)%>%
+  parallel_theilsen_lc() %>%
+  mutate(variable = "night_afd_per_op_per_Mkm2")
+,
+koppen_night_frp <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+  filter(dn_detect == "night")%>%
+  dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                               time2 = min(year_month), 
+                                               units = "days")),
+                cell = lut_kop[koppen]) %>%
+  dplyr::rename(value = mean_frp_per_detection)%>%
+  parallel_theilsen_lc() %>%
+  mutate(variable = "mean_frp_per_detection")
+)-> koppen_trends
+
+write_csv(koppen_trends, "out/koppen_trends_raw.csv")
+
+koppen_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         sign = ifelse(beta>0, "+", "-"),
+         sign_sig = ifelse(p<0.05, sign, sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "sign_sig") %>%
+  write_csv("out/koppen_trends_pretty.csv")
+
+# MONTHLY by landcover =========================================================
+lck_tab <- read_csv("in/csvs_from_michael/koppen-modis-landcover-lookup-table.csv")
+lut_lc <- pull(lck_tab, koppen_modis_name)
+names(lut_lc)<- pull(lck_tab, koppen_modis_code)
+
+bind_rows(
+  landcover_percent_n_night <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-landcover_wide.csv") %>%
+    mutate(value = prop_n_night*100)%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_lc[as.character(lc)])%>%
+    parallel_theilsen_lc() %>%
+    mutate(variable = "percent_afd_night")
+  ,
+  landcover_day_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-landcover.csv")%>%
+    filter(dn_detect == "day")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_lc[as.character(lc)]) %>%
+    dplyr::rename(value = n_per_op_per_Mkm2)%>%
+    parallel_theilsen_lc() %>%
+    mutate(variable = "day_afd_per_op_per_Mkm2")
+  ,
+  landcover_night_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-landcover.csv")%>%
+    filter(dn_detect == "night")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_lc[as.character(lc)]) %>%
+    dplyr::rename(value = n_per_op_per_Mkm2)%>%
+    parallel_theilsen_lc() %>%
+    mutate(variable = "night_afd_per_op_per_Mkm2")
+  ,
+  landcover_night_frp <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-landcover.csv")%>%
+    filter(dn_detect == "night")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_lc[as.character(lc)]) %>%
+    dplyr::rename(value = mean_frp_per_detection)%>%
+    parallel_theilsen_lc() %>%
+    mutate(variable = "mean_frp_per_detection")
+)-> landcover_trends
+
+write_csv(landcover_trends, "out/landcover_trends_raw.csv")
+
+landcover_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         sign = ifelse(beta>0, "+", "-"),
+         sign_sig = ifelse(p<0.05, sign, sig)) %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "sign_sig") %>%
+  write_csv("out/landcover_trends_pretty.csv")

@@ -17,6 +17,7 @@
 # Output files from R CMD check
 /*.Rcheck/
 
+in/csvs_from_michael/*
 # RStudio files
 .Rproj.user/
 

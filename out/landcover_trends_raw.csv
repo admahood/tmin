@@ -1,0 +1,101 @@
+cell,p,beta,n,variable
+Equatorial Evergreen Broadleaf Forests,0.017166454656775847,-1.453508257027852e-4,216,percent_afd_night
+Equatorial Deciduous Broadleaf Forests,1.414577497577207e-20,5.553184604574156e-4,216,percent_afd_night
+Equatorial Woody Savannas,0.004782040797770355,1.3228298977897336e-4,216,percent_afd_night
+Equatorial Savannas,0.2506056898474597,5.2863841562622986e-5,216,percent_afd_night
+Equatorial Grasslands,0.15539257962169298,5.269886968808156e-5,216,percent_afd_night
+Equatorial Permanent Wetlands,0.004362012712430372,-3.175233682335138e-4,216,percent_afd_night
+Equatorial Croplands,0.061353510667079954,-8.075223427325915e-5,216,percent_afd_night
+Equatorial Cropland Natural Vegetation Mosaics,0.04737354208625357,-1.943047013536019e-5,216,percent_afd_night
+Arid Open Shrublands,0.009850407806248811,-8.959630640549379e-5,216,percent_afd_night
+Arid Woody Savannas,1.021269661316516e-6,5.659317971476476e-4,216,percent_afd_night
+Arid Savannas,4.686292451481866e-16,0.0012433031098791267,216,percent_afd_night
+Arid Grasslands,0.008621491553050488,1.4706167146233024e-4,216,percent_afd_night
+Arid Croplands,6.350390493407019e-4,2.9772675052701066e-4,216,percent_afd_night
+Temperate Evergreen Needleleaf Forests,2.0960828644499556e-11,0.0015132487215936004,216,percent_afd_night
+Temperate Evergreen Broadleaf Forests,2.8200991121742588e-11,5.910008258401782e-4,216,percent_afd_night
+Temperate Deciduous Broadleaf Forests,2.3753154191234245e-5,-4.356100033326574e-4,216,percent_afd_night
+Temperate Woody Savannas,0.8503509018640892,-4.9595164711926e-5,216,percent_afd_night
+Temperate Savannas,0.04476360389207001,1.0691013068467542e-4,216,percent_afd_night
+Temperate Grasslands,0.29626091756413614,6.100452879579005e-5,216,percent_afd_night
+Temperate Croplands,0.5450727380801663,-7.226863514223059e-6,216,percent_afd_night
+Boreal Evergreen Needleleaf Forests,2.988687002023132e-4,8.321168600173238e-4,216,percent_afd_night
+Boreal Woody Savannas,0.0010945015262869436,6.562021210984631e-4,216,percent_afd_night
+Boreal Savannas,0.02340445909592883,2.9861962497935936e-4,216,percent_afd_night
+Boreal Grasslands,0.004717586236124062,4.2614224795322123e-4,216,percent_afd_night
+Boreal Croplands,1.6138013254002347e-4,2.229879990231756e-4,216,percent_afd_night
+Equatorial Evergreen Broadleaf Forests,0.6623965182645631,1.1116207614980021e-4,216,day_afd_per_op_per_Mkm2
+Equatorial Deciduous Broadleaf Forests,0.20423242353407148,-0.0016215055145595279,216,day_afd_per_op_per_Mkm2
+Equatorial Woody Savannas,0.0037357157226041433,-0.004643274317396204,216,day_afd_per_op_per_Mkm2
+Equatorial Savannas,0.01826081806979653,-0.0019307381233998732,216,day_afd_per_op_per_Mkm2
+Equatorial Grasslands,1.3424242878107336e-4,-0.004496459874565975,216,day_afd_per_op_per_Mkm2
+Equatorial Permanent Wetlands,0.3438345666928383,-2.1136123215250924e-4,216,day_afd_per_op_per_Mkm2
+Equatorial Croplands,4.238637062919269e-6,-0.003166433050843202,216,day_afd_per_op_per_Mkm2
+Equatorial Cropland Natural Vegetation Mosaics,1.0269238594210627e-6,-0.004752572647917709,216,day_afd_per_op_per_Mkm2
+Arid Open Shrublands,0.01919096774969858,2.493081213305723e-4,216,day_afd_per_op_per_Mkm2
+Arid Woody Savannas,0.0017533909860591522,9.08771290349506e-4,216,day_afd_per_op_per_Mkm2
+Arid Savannas,0.0028005091564424025,0.0015553443949751491,216,day_afd_per_op_per_Mkm2
+Arid Grasslands,2.556680611973008e-4,-6.130778050450659e-4,216,day_afd_per_op_per_Mkm2
+Arid Croplands,0.41194660931383054,-1.7930053553677196e-4,216,day_afd_per_op_per_Mkm2
+Temperate Evergreen Needleleaf Forests,0.5810337191069549,-8.858178110644111e-5,216,day_afd_per_op_per_Mkm2
+Temperate Evergreen Broadleaf Forests,0.0014334585004235918,-7.297548716346531e-4,216,day_afd_per_op_per_Mkm2
+Temperate Deciduous Broadleaf Forests,0.03938387254031453,-0.001867369317361998,216,day_afd_per_op_per_Mkm2
+Temperate Woody Savannas,0.0355992033450842,-0.0014779377039850494,216,day_afd_per_op_per_Mkm2
+Temperate Savannas,0.10505452203771382,-0.001409145149618199,216,day_afd_per_op_per_Mkm2
+Temperate Grasslands,0.5200812235979924,-3.942698112305069e-4,216,day_afd_per_op_per_Mkm2
+Temperate Croplands,0.0045754363202681475,-3.4191063398261213e-4,216,day_afd_per_op_per_Mkm2
+Boreal Evergreen Needleleaf Forests,0.11174923225509266,1.9446538272850598e-5,216,day_afd_per_op_per_Mkm2
+Boreal Woody Savannas,0.815562858811663,-9.41861993073593e-6,216,day_afd_per_op_per_Mkm2
+Boreal Savannas,0.024077364000828598,-2.381449209746251e-4,216,day_afd_per_op_per_Mkm2
+Boreal Grasslands,0.001428078347069211,-3.2771694592087936e-4,216,day_afd_per_op_per_Mkm2
+Boreal Croplands,0.028714526709138998,-2.3085562993730818e-4,216,day_afd_per_op_per_Mkm2
+Equatorial Evergreen Broadleaf Forests,0.04798421108677324,-6.237609387474711e-5,216,night_afd_per_op_per_Mkm2
+Equatorial Deciduous Broadleaf Forests,2.2192637508075114e-12,0.0017588863483154879,216,night_afd_per_op_per_Mkm2
+Equatorial Woody Savannas,0.28878221789812,-1.3615361164692833e-4,216,night_afd_per_op_per_Mkm2
+Equatorial Savannas,0.19734274555043105,-8.360260372151102e-5,216,night_afd_per_op_per_Mkm2
+Equatorial Grasslands,0.07621718700064357,-4.936099602922118e-5,216,night_afd_per_op_per_Mkm2
+Equatorial Permanent Wetlands,8.553573519949219e-7,-3.480974527124876e-4,216,night_afd_per_op_per_Mkm2
+Equatorial Croplands,3.910513540953774e-20,-0.0010980387638329526,216,night_afd_per_op_per_Mkm2
+Equatorial Cropland Natural Vegetation Mosaics,2.6976606956563052e-11,-7.504929972511767e-4,216,night_afd_per_op_per_Mkm2
+Arid Open Shrublands,0.28435659376233424,1.864127864684188e-5,216,night_afd_per_op_per_Mkm2
+Arid Woody Savannas,1.286534743178026e-6,4.3872827169005543e-4,216,night_afd_per_op_per_Mkm2
+Arid Savannas,2.9629863556614107e-16,8.197594750240448e-4,216,night_afd_per_op_per_Mkm2
+Arid Grasslands,0.04172722495133453,-6.181993072774109e-5,216,night_afd_per_op_per_Mkm2
+Arid Croplands,2.841311685110927e-6,8.415601797641404e-5,216,night_afd_per_op_per_Mkm2
+Temperate Evergreen Needleleaf Forests,1.664470190050535e-5,1.4033759449583188e-4,216,night_afd_per_op_per_Mkm2
+Temperate Evergreen Broadleaf Forests,0.36243750364334487,4.472105258241026e-5,216,night_afd_per_op_per_Mkm2
+Temperate Deciduous Broadleaf Forests,6.89416818621826e-10,-4.1286781041211006e-4,216,night_afd_per_op_per_Mkm2
+Temperate Woody Savannas,0.004765853650040945,-1.7483425645710974e-4,216,night_afd_per_op_per_Mkm2
+Temperate Savannas,0.0633392807699162,-1.1074525179456581e-4,216,night_afd_per_op_per_Mkm2
+Temperate Grasslands,0.10860023357640193,1.0144215774513166e-4,216,night_afd_per_op_per_Mkm2
+Temperate Croplands,0.5967782959641209,-1.4288598845659162e-5,216,night_afd_per_op_per_Mkm2
+Boreal Evergreen Needleleaf Forests,5.407647415135306e-4,1.6052927224613362e-05,215,night_afd_per_op_per_Mkm2
+Boreal Woody Savannas,0.09979690560852902,1.6952812122794052e-5,216,night_afd_per_op_per_Mkm2
+Boreal Savannas,0.12899546305228396,-1.2356417732287385e-5,212,night_afd_per_op_per_Mkm2
+Boreal Grasslands,0.027317000222595415,-3.5656488663245406e-5,216,night_afd_per_op_per_Mkm2
+Boreal Croplands,0.05626214849401692,3.2708953941244e-5,216,night_afd_per_op_per_Mkm2
+Equatorial Evergreen Broadleaf Forests,4.2318098981707466e-7,-3.7403676491637184e-4,216,mean_frp_per_detection
+Equatorial Deciduous Broadleaf Forests,0.831643364336882,-7.928942230871344e-5,216,mean_frp_per_detection
+Equatorial Woody Savannas,3.064875610730996e-4,4.824562530479291e-4,216,mean_frp_per_detection
+Equatorial Savannas,0.7397286487485428,-1.109004114810958e-5,216,mean_frp_per_detection
+Equatorial Grasslands,0.12268047717859132,8.114246962168853e-5,216,mean_frp_per_detection
+Equatorial Permanent Wetlands,0.22720070893041394,-3.3105950382657223e-4,216,mean_frp_per_detection
+Equatorial Croplands,2.5362277156364834e-7,-8.270760322313781e-4,216,mean_frp_per_detection
+Equatorial Cropland Natural Vegetation Mosaics,1.0051870423592876e-12,-0.0011209166796160895,216,mean_frp_per_detection
+Arid Open Shrublands,0.4726009619252409,3.682722064008086e-4,216,mean_frp_per_detection
+Arid Woody Savannas,0.5654863691058598,-2.4547790768640154e-4,216,mean_frp_per_detection
+Arid Savannas,0.0852739494181338,2.7543325009881856e-4,216,mean_frp_per_detection
+Arid Grasslands,1.8068378155713228e-4,5.76649649577135e-4,216,mean_frp_per_detection
+Arid Croplands,2.7055645064601355e-23,0.0010500058040695797,216,mean_frp_per_detection
+Temperate Evergreen Needleleaf Forests,1.5071342349039722e-6,0.0010806649549389502,216,mean_frp_per_detection
+Temperate Evergreen Broadleaf Forests,3.2047608014514973e-21,0.0036344055012444867,216,mean_frp_per_detection
+Temperate Deciduous Broadleaf Forests,1.370966550098257e-8,-9.076603135864567e-4,216,mean_frp_per_detection
+Temperate Woody Savannas,0.200001558038843,-4.825180410146072e-4,216,mean_frp_per_detection
+Temperate Savannas,0.03274575792266605,-0.00026357559994490115,216,mean_frp_per_detection
+Temperate Grasslands,0.3899981565478792,-2.5592995007990576e-4,216,mean_frp_per_detection
+Temperate Croplands,1.2844722239043843e-4,-7.305734654796665e-4,216,mean_frp_per_detection
+Boreal Evergreen Needleleaf Forests,8.301122788700268e-6,0.0012571657483948489,215,mean_frp_per_detection
+Boreal Woody Savannas,4.07031613463279e-5,0.0011714744411493638,216,mean_frp_per_detection
+Boreal Savannas,9.919860144294362e-6,7.757278425232074e-4,212,mean_frp_per_detection
+Boreal Grasslands,0.26245562877028433,1.1325294397741083e-4,216,mean_frp_per_detection
+Boreal Croplands,0.008430570986414384,2.997097562819587e-4,216,mean_frp_per_detection
