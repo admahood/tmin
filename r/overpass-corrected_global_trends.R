@@ -141,55 +141,6 @@ mod14_night_counts<- list.files("data/gridded_mod14/AFC_num",
 # do the adjusting =================
 dir.create("data/adjusted_counts")
 
-# monthly ==========================
-registerDoParallel(detectCores()/2)
-foreach(i = 1:nrow(mod14_day_counts))%dopar%{
-  system(paste("echo",i))
-  monthi <- mod14_day_counts$month_n[i]
-  yeari <- mod14_day_counts$year[i]
-  
-  counts <- filter(mod14_day_counts, year == yeari, month_n == monthi) %>%
-    pull(value) %>%
-    raster
-  overpasses<- filter(op_days, year == yeari, month == monthi) %>%
-    pull(value) %>%
-    raster
-  
-  adjusted <- counts/overpasses
-  outfile <- paste0("data/adjusted_counts/op-adjusted_D_", 
-                   yeari,
-                   str_pad(monthi, width=2, side="left", pad = "0"),
-                   ".tif"
-                   )
-  writeRaster(adjusted,outfile, overwrite=TRUE)  
-
-  counts_n <- filter(mod14_night_counts, year == yeari, month_n == monthi) %>%
-    pull(value) %>%
-    raster
-  overpasses_n<- filter(op_nights, year == yeari, month == monthi) %>%
-    pull(value) %>%
-    raster
-  
-  adjusted_n <- counts_n/overpasses_n
-  outfile_n <- paste0("data/adjusted_counts/op-adjusted_N_", 
-                    yeari,
-                    str_pad(monthi, width=2, side="left", pad = "0"),
-                    ".tif"
-  )
-  writeRaster(adjusted_n,outfile_n, overwrite=TRUE)
-  
-  if(str_extract(outfile, "\\d{6}")==str_extract(outfile_n, "\\d{6}")){
-  
-    nf<- adjusted_n/(adjusted+adjusted_n)
-    outfile_nf <- paste0("data/adjusted_counts/op-adjusted_NF_", 
-                        yeari,
-                        str_pad(monthi, width=2, side="left", pad = "0"),
-                        ".tif"
-    )
-    writeRaster(nf,outfile_nf, overwrite=TRUE)
-  }
-}
-
 # annual =====================
 raw_n <- list.files("data/gridded_mod14/AFC_num", full.names = TRUE, pattern = "_N_") %>%
   as_tibble() %>%
@@ -900,6 +851,16 @@ frp_ts <- long_df %>%
 
 bind_rows(day_afd_ts, night_afd_ts, nf_ts, frp_ts)-> global_trends
 
+# global predictions
+global_preds <- tibble("day_afd_per_ovp"=predict(day_afd_ts), 
+       "night_afd_per_ovp"=   predict(night_afd_ts), 
+       "percent_n_afd"=  predict(nf_ts), 
+       "night_frp_MW_per_afd"= predict(frp_ts)) %>%
+  slice(c(1,216)) %>%
+  mutate(date = c("January 2003", "December 2020"))
+
+write_csv(global_preds, "out/global_prediction_bookends.csv")
+predict(nf_ts)
 
 # https://fromthebottomoftheheap.net/2014/05/09/modelling-seasonal-data-with-gam/
 nf_gam <- gamm(percent_n_night ~ 
@@ -1019,6 +980,20 @@ koppen_trends %>%
   pivot_wider(id_cols = cell, names_from = "variable", values_from = "sign_sig") %>%
   write_csv("out/koppen_trends_pretty.csv")
 
+koppen_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         bs = paste(round(beta*365.25,2),sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
+  write_csv("out/koppen_trends_pretty_year.csv")
+
+koppen_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         bs = paste(round(beta,5),sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
+  write_csv("out/koppen_trends_pretty_day.csv")
+
 # MONTHLY by landcover =========================================================
 lck_tab <- read_csv("in/csvs_from_michael/koppen-modis-landcover-lookup-table.csv")
 lut_lc <- pull(lck_tab, koppen_modis_name)
@@ -1074,3 +1049,17 @@ landcover_trends %>%
          sign_sig = ifelse(p<0.05, sign, sig)) %>%
   pivot_wider(id_cols = cell, names_from = "variable", values_from = "sign_sig") %>%
   write_csv("out/landcover_trends_pretty.csv")
+
+landcover_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         bs = paste(round(beta*365.25,2),sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
+  write_csv("out/landcover_trends_pretty_year.csv")
+
+landcover_trends %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         bs = paste(round(beta,5),sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
+  write_csv("out/landcover_trends_pretty_day.csv")

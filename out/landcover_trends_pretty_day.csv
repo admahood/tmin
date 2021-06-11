@@ -1,0 +1,26 @@
+cell,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_detection
+Equatorial Evergreen Broadleaf Forests,-0.00015 *,0.00011 ,-6e-05 *,-0.00037 *
+Equatorial Deciduous Broadleaf Forests,0.00056 *,-0.00162 ,0.00176 *,-8e-05 
+Equatorial Woody Savannas,0.00013 *,-0.00464 *,-0.00014 ,0.00048 *
+Equatorial Savannas,5e-05 ,-0.00193 *,-8e-05 ,-1e-05 
+Equatorial Grasslands,5e-05 ,-0.0045 *,-5e-05 ,8e-05 
+Equatorial Permanent Wetlands,-0.00032 *,-0.00021 ,-0.00035 *,-0.00033 
+Equatorial Croplands,-8e-05 ,-0.00317 *,-0.0011 *,-0.00083 *
+Equatorial Cropland Natural Vegetation Mosaics,-2e-05 *,-0.00475 *,-0.00075 *,-0.00112 *
+Arid Open Shrublands,-9e-05 *,0.00025 *,2e-05 ,0.00037 
+Arid Woody Savannas,0.00057 *,0.00091 *,0.00044 *,-0.00025 
+Arid Savannas,0.00124 *,0.00156 *,0.00082 *,0.00028 
+Arid Grasslands,0.00015 *,-0.00061 *,-6e-05 *,0.00058 *
+Arid Croplands,3e-04 *,-0.00018 ,8e-05 *,0.00105 *
+Temperate Evergreen Needleleaf Forests,0.00151 *,-9e-05 ,0.00014 *,0.00108 *
+Temperate Evergreen Broadleaf Forests,0.00059 *,-0.00073 *,4e-05 ,0.00363 *
+Temperate Deciduous Broadleaf Forests,-0.00044 *,-0.00187 *,-0.00041 *,-0.00091 *
+Temperate Woody Savannas,-5e-05 ,-0.00148 *,-0.00017 *,-0.00048 
+Temperate Savannas,0.00011 *,-0.00141 ,-0.00011 ,-0.00026 *
+Temperate Grasslands,6e-05 ,-0.00039 ,1e-04 ,-0.00026 
+Temperate Croplands,-1e-05 ,-0.00034 *,-1e-05 ,-0.00073 *
+Boreal Evergreen Needleleaf Forests,0.00083 *,2e-05 ,2e-05 *,0.00126 *
+Boreal Woody Savannas,0.00066 *,-1e-05 ,2e-05 ,0.00117 *
+Boreal Savannas,3e-04 *,-0.00024 *,-1e-05 ,0.00078 *
+Boreal Grasslands,0.00043 *,-0.00033 *,-4e-05 *,0.00011 
+Boreal Croplands,0.00022 *,-0.00023 *,3e-05 ,3e-04 *

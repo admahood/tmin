@@ -1,0 +1,5 @@
+cell,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_detection
+Equatorial,0.02 ,-0.54 *,-0.09 *,-0.01 
+Arid,0.18 *,-0.04 ,0.04 *,0.06 *
+Temperate,0.05 *,-0.59 *,-0.03 ,0.21 *
+Boreal,0.11 *,-0.08 ,0.01 ,0.2 *
