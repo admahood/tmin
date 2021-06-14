@@ -87,6 +87,26 @@ thresholds <- read_csv("in/updated-goes-af-vpd-thresholds.csv") %>%
 
 write_csv(thresholds %>% dplyr::select(-area_km2),"out/lck_thresh_area.csv")
 
+# making a table of burnable koppen area =======================================
+
+burnable_koppen <-
+  thresholds %>%
+  separate(lc_kop, into = "koppen") %>%
+  group_by(koppen) %>%
+  summarise(area_Mkm2 = sum(millions_of_km2)) %>%
+  ungroup()
+
+write.csv(burnable_koppen, "out/burnable_koppen.csv")
+
+# making a burnable globe mask
+
+burnable <- lck_poly %>%
+  st_as_sf %>%
+  mutate(kop = lut_kop[str_sub(lck,1,1)],
+         lc = lut_lc[str_sub(lck,2,3)],
+         lc_kop = paste(kop, lc)) %>%
+  filter(lc_kop %in% pull(thresholds, lc_kop))
+
 # grabbing some quick numbers for the paper
 # earth has 148940000 km2 of land surface area (from wikipedia)
 total_land_area = lck_tab %>% pull(area_km2) %>% sum #145M km2 -- close enough

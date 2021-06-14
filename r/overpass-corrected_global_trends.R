@@ -13,6 +13,9 @@ library(doParallel)
 library(foreach)
 library(mgcv)
 
+posneg_cols <- c("orange", "Black")
+dir.create("out")
+
 # thresholds ===================================================================
 thresholds <- read_csv("data/updated-goes-af-vpd-thresholds.csv")
 burnable_lcs<- pull(thresholds, lc_name)
@@ -74,6 +77,37 @@ parallel_theilsen_lc <- function(stack_df, zero_to_na=FALSE, pb =TRUE,
   }
 }
 
+parallel_gamm_lc <- function(stack_df, zero_to_na=FALSE, pb =TRUE,
+                                 minimum_sample = 10, workers = 1){
+  require(doParallel)
+  require(foreach)
+  cells<-unique(stack_df$cell)
+  
+  
+  registerDoParallel(workers)
+  result<-foreach(i = cells, .combine = bind_rows)%dopar%{
+    
+    dd<-filter(stack_df, cell==i) %>%
+      replace_na(list(value = 0))
+    
+    if(zero_to_na) dd<-dd %>% filter(value>0)
+    
+    if(nrow(dd)>=minimum_sample & sum(dd$value)>0){
+      mod<- gamm(value ~ 
+               s(acq_month, bs = "cc", k = 12) + 
+               s(timestep),
+             correlation = corAR1(form = ~ timestep), 
+             data = dd)
+      sum<-summary(mod$lme)
+      df<-tibble(cell = dd$cell[1],
+                 p = sum$tTable[2,5],
+                 beta = sum$coefficients$fixed[2],
+                 n = nrow(dd))
+      #if(pb) system(paste("echo", df[1,1], "p=", round(df[1,2],2),"b=", round(df[1,3],2)))
+      return(df)
+    }
+  }
+}
 # file getting ============
 
 system(paste("aws s3 sync",
@@ -93,6 +127,7 @@ system(paste("aws s3 sync",
              "s3://earthlab-jmcglinchy/night_fire/gridded/vars_refresh_may2021/CSV_nocorn_grid_2_5_degree_vars",
              "data/gridded_mod14_2_5"))
 
+# pointing to the overpass counts ==============================================
 op_days <- list.files("data/overpass_counts/year-month", 
                       full.names = TRUE, pattern = "*day*") %>%
   as_tibble() %>%
@@ -115,6 +150,7 @@ op_nights_annual <- list.files("data/overpass_counts/annual",
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}") %>% as.numeric)
 
+# pointing to the monthly grids with month =====================================
 mod14_day_counts<- list.files("data/gridded_mod14/AFC_num", 
                               full.names = TRUE,
                               pattern = "_D_") %>%
@@ -138,26 +174,81 @@ mod14_night_counts<- list.files("data/gridded_mod14/AFC_num",
          month_n = lubridate::month(date)) 
 
 
-# do the adjusting =================
-dir.create("data/adjusted_counts")
-
-# annual =====================
-raw_n <- list.files("data/gridded_mod14/AFC_num", full.names = TRUE, pattern = "_N_") %>%
+# pointing to the raw monthly grids ============================================
+raw_n <- list.files("data/gridded_mod14/AFC_num", 
+                    full.names = TRUE, pattern = "_N_") %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-raw_d <- list.files("data/gridded_mod14/AFC_num", full.names = TRUE, pattern = "_D_")%>%
+raw_d <- list.files("data/gridded_mod14/AFC_num", 
+                    full.names = TRUE, pattern = "_D_")%>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-raw_frp_mean <- list.files("data/gridded_mod14/FRP_mean", pattern = "_N_", full.names = TRUE) %>%
+raw_frp_mean <- list.files("data/gridded_mod14/FRP_mean",
+                           pattern = "_N_", full.names = TRUE) %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
-raw_frp_total <- list.files("data/gridded_mod14/FRP_total", pattern = "_N_", full.names = TRUE) %>%
+raw_frp_total <- list.files("data/gridded_mod14/FRP_total", 
+                            pattern = "_N_", full.names = TRUE) %>%
   as_tibble() %>%
   mutate(year = str_extract(value,"\\d{4}"))
 
+# monthly adjust ===============================================================
+dir.create("data/monthly_adjusted_counts")
+ym <- op_days %>%
+  filter(year>2002) %>%
+  pull(ym)
+for(y in ym){
+  print(y)
+  year_i <- str_extract(y, "\\d{4}")
+  month_i <- str_extract(y, "-\\d{2}") %>%
+    str_remove("-")
+  
+  d<-filter(mod14_day_counts, 
+            year == year_i &
+            month_n == as.numeric(month_i)) %>%
+    pull(value) %>%
+    terra::rast()
+  
+  op_d<-filter(op_days, 
+               year == year_i &
+               month == as.numeric(month_i)) %>%
+    pull(value) %>%
+    terra::rast()
+  
+  adjusted_d <-d/op_d
+  terra::writeRaster(adjusted_d, 
+                     filename = paste0("data/monthly_adjusted_counts/day_afd_per_overpass_",
+                                       year_i,"-",month_i, ".tif"),
+                     overwrite = TRUE)
+  n<-filter(mod14_night_counts, 
+            year == year_i &
+              month_n == as.numeric(month_i)) %>%
+    pull(value) %>%
+    terra::rast()
+  
+  op_n<-filter(op_nights, 
+               year == year_i &
+                 month == as.numeric(month_i)) %>%
+    pull(value) %>%
+    terra::rast()
+  
+  adjusted_n <-n/op_n
+  terra::writeRaster(adjusted_n, 
+                     filename = paste0("data/monthly_adjusted_counts/night_afd_per_overpass_",
+                                       year_i,"-",month_i, ".tif"),
+                     overwrite = TRUE)
+  nf<- adjusted_n/(adjusted_n+adjusted_d) * 100
+  terra::writeRaster(nf, 
+                     filename = paste0("data/monthly_adjusted_counts/percent_night_afd_",
+                                       year_i,"-",month_i, ".tif"),
+                     overwrite = TRUE)
+}
+
+
+# annual sum and adjust ========================================================
 dir.create("data/annual_adjusted_counts")
 years <- 2003:2020
 for(y in years){
@@ -209,8 +300,132 @@ for(y in years){
 
 
 # TIME SERIES ANALYSIS =========================================================
+# MONTHLY ======================================================================
+# day afd per overpass trends ==================================================
+day_counts <- list.files("data/monthly_adjusted_counts", 
+                         pattern = "day",
+                         full.names = TRUE) %>%
+  terra::rast()
+
+day_counts_df <- day_counts %>%
+  as.data.frame(xy=TRUE, cells=TRUE) %>%
+  mutate(rsum = rowSums(.[4:ncol(.)])) %>% 
+  filter(rsum>0) %>%
+  dplyr::select(-rsum) %>%
+  pivot_longer(cols = names(.)[4:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  tidyr::separate(layer, into = c("sat", "daynight", "variable", "unit", 
+                                  "month", "year")) %>%
+  mutate(date = as.Date(paste(year, str_to_lower(month), "15", sep = "-"), 
+                        "%Y-%B-%d"),
+         timestep =  as.numeric(difftime(time1 = date, 
+                                         time2 = min(date), units = "days")))
+
+day_counts_trends<-parallel_theilsen(day_counts_df,
+                                     zero_to_na = FALSE, 
+                                     pb=TRUE,
+                                     workers=4,
+                                     minimum_sample = 10)
+
+save(day_counts_trends, file = "data/day_counts_trends_monthly.Rda")
+
+p_dc_m <- ggplot(day_counts_trends %>% filter(p<0.05) %>% 
+               mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25, fill="transparent")+
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = posneg_cols)+
+  theme_void()+
+  ggtitle("Annual Sums of Daytime Active Fire Detections", 
+          "1 degree, 2003-2020, p<0.05")+
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/day_count_trend_1_deg_monthly_2003-2020.png")
+
+# night afd per overpass =======================================================
+night_counts <- list.files("data/monthly_adjusted_counts", 
+                         pattern = "night_afd_per_overpass",
+                         full.names = TRUE) %>%
+  terra::rast()
+
+night_counts_df <- night_counts %>%
+  as.data.frame(xy=TRUE, cells=TRUE, na.rm=FALSE) %>%
+  mutate(rsum = rowSums(.[4:ncol(.)])) %>% 
+  filter(rsum>0) %>%
+  dplyr::select(-rsum) %>%
+  pivot_longer(cols = names(.)[4:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  tidyr::separate(layer, into = c("sat", "daynight", "variable", "unit", 
+                                  "month", "year")) %>%
+  mutate(date = as.Date(paste(year, str_to_lower(month), "15", sep = "-"), 
+                        "%Y-%B-%d"),
+         timestep =  as.numeric(difftime(time1 = date, 
+                                         time2 = min(date), units = "days")))
+
+night_counts_trends<-parallel_theilsen(night_counts_df,
+                                     zero_to_na = FALSE, 
+                                     pb=TRUE,
+                                     workers=4,
+                                     minimum_sample = 10)
+
+save(night_counts_trends, file = "data/night_counts_trends_monthly.Rda")
+
+p_nc_m<-ggplot(night_counts_trends %>% filter(p<0.05) %>% 
+               mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25) +
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = posneg_cols) +
+  theme_void() +
+  ggtitle("Annual sums of Nighttime Active Fire Detections", 
+          "1 degree, 2003-2020, p<0.05") +
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/day_count_trend_1_deg_monthly_2003-2020.png")
+# percent night afd per overpass ===============================================
+night_percent <- list.files("data/monthly_adjusted_counts", 
+                           pattern = "percent_night",
+                           full.names = TRUE) %>%
+  terra::rast()
+
+night_percent[is.na(night_percent)] <- 0
+
+night_percent_df <- night_percent %>%
+  as.data.frame(xy=TRUE, cells=TRUE, na.rm=FALSE) %>%
+  mutate(rsum = rowSums(.[4:ncol(.)])) %>%
+  filter(rsum > 0) %>%
+  dplyr::select(-rsum) %>%
+  pivot_longer(cols = names(.)[4:ncol(.)],
+               names_to = "layer", 
+               values_to = "value") %>%
+  tidyr::separate(layer, into = c("sat", "daynight", "variable", "unit", 
+                                  "month", "year")) %>%
+  mutate(date = as.Date(paste(year, str_to_lower(month), "15", sep = "-"), 
+                        "%Y-%B-%d"),
+         timestep =  as.numeric(difftime(time1 = date, 
+                                         time2 = min(date), units = "days")))
+
+night_percent_trends<-parallel_theilsen(night_percent_df,
+                                       zero_to_na = FALSE, 
+                                       pb=TRUE,
+                                       workers=4,
+                                       minimum_sample = 10)
+
+save(night_counts_trends, file = "data/night_counts_trends_monthly.Rda")
+
+p_np_m<-ggplot(night_percent_trends %>% filter(p<0.05) %>% 
+                 mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
+  geom_sf(data = st_read("world.gpkg"), lwd=0.25) +
+  geom_raster(aes(x=x,y=y,fill=Trend)) +
+  scale_fill_manual(values = posneg_cols) +
+  theme_void() +
+  ggtitle("Annual sums of Nighttime Active Fire Detections", 
+          "1 degree, 2003-2020, p<0.05") +
+  theme(legend.position = c(0.1,0.2),
+        legend.justification = c(0,0)) +
+  ggsave("out/night_percent_trend_1_deg_monthly_2003-2020.png")
 # ANNUAL =======================================================================
-## annual day counts============================================================
+## annual day counts ===========================================================
 day_counts <- list.files("data/annual_adjusted_counts", 
                          pattern = "day",
                          full.names = TRUE) %>%
@@ -256,7 +471,7 @@ p_dc<-ggplot(day_counts_trends %>% filter(p<0.05) %>%
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
   ggtitle("Annual sums of daytime active fire detections", 
-          "1 degree, 2003-2018, p<0.05")+
+          "1 degree, 2003-2020, p<0.05")+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/day_count_trend_1_deg_2003-2018.png")
@@ -290,7 +505,7 @@ p_nc<-ggplot(night_counts_trends %>% filter(p<0.05) %>%
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
   ggtitle("Annual sums of nighttime active fire detections",
-          "1 degree, 2003-2018, p<0.05")+
+          "1 degree, 2003-2020, p<0.05")+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/night_count_trend_1_deg_2003-2018.png")
@@ -326,7 +541,7 @@ p_nf<-ggplot(night_fraction_trends %>% filter(p<0.05) %>%
   ggtitle("Fraction of detections that occur at night", "1 degree, 2003-2018, p<0.05")+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
-  ggsave("out/night_fraction_trend_1_deg_2003-2018.png")
+  ggsave("out/night_fraction_trend_1_deg_2003-2020.png")
 save(night_fraction_trends,file="night_fraction_trends.Rda")
 ## annual night frp mean =======================================================
 
@@ -360,54 +575,21 @@ p_frp <- ggplot(night_frp_trends %>% filter(p<0.05) %>%
   scale_fill_manual(values = c("blue","red"))+
   theme_void()+
   ggtitle("Annual mean nighttime FRP, MW per active fire detection", 
-          "1 degree, 2003-2018, p<0.05")+
+          "1 degree, 2003-2020, p<0.05")+
   theme(legend.position = c(0.1,0.2),
         legend.justification = c(0,0)) +
   ggsave("out/night_frp_trend_1_deg_2003-2018.png")
 
 save(night_frp_trends, file = "night_frp_mean_trends.Rda")
 
-## annual night frp total ======================================================
-
-night_frp_mw_per_ovp <- list.files("data/annual_adjusted_counts", 
-                        pattern = "annual_night_frp_MW_per_ovp", 
-                        full.names = TRUE) %>%
-  terra::rast()
-
-
-adj_night_frp_df<-night_frp_mw_per_ovp %>%
-  as.data.frame(xy=TRUE, cells=TRUE) %>%
-  mutate(rsum = rowSums(.[4:ncol(.)])) %>%
-  filter(rsum>0) %>%
-  dplyr::select(-rsum) %>%
-  pivot_longer(cols = names(.)[4:ncol(.)],
-               names_to = "layer", 
-               values_to = "value") %>%
-  mutate(timestep = 1+(str_sub(layer,6,7) %>% as.numeric)) %>%
-  replace_na(list(timestep = 1))
-
-adj_night_frp_trends<-parallel_theilsen(adj_night_frp_df,
-                                    zero_to_na = FALSE,
-                                    workers=4, minimum_sample = 10)%>%
-  left_join(dc_area,by=c("y"="lat"))
-
-p_adj_frp <- ggplot(adj_night_frp_trends %>% filter(p<0.05) %>% 
-                  mutate(Trend = ifelse(beta > 0, "positive", "negative"))) +
-  geom_sf(data = st_read("world.gpkg"), lwd=0.25)+
-  geom_raster(aes(x=x,y=y,fill=Trend)) +
-  scale_fill_manual(values = c("blue","red"))+
-  theme_void()+
-  ggtitle("Annual Mean Nighttime FRP MW per Overpass", 
-          "1 degree, 2003-2018, p<0.05")+
-  theme(legend.position = c(0.1,0.2),
-        legend.justification = c(0,0)) +
-  ggsave("out/adjusted_total_night_frp_trend_1_deg_2003-2018.png")
-
-save(adj_night_frp_trends, file = "night_frp_total_trends.Rda")
+## 4pan plot ======================================================
 
 # all together
 library(ggpubr)
-ggarrange(p_dc, p_nc, p_nf, p_adj_frp, nrow = 2, ncol=2) +
+ggarrange(p_dc, 
+          p_nc, 
+          p_nf, 
+          p_frp, nrow = 2, ncol=2) +
   ggsave(height = 7, width=12, filename = "out/annual_4pan.png")
 
 # table of trends per area
@@ -415,8 +597,7 @@ ggarrange(p_dc, p_nc, p_nf, p_adj_frp, nrow = 2, ncol=2) +
 bind_rows("daytime_afd"=day_counts_trends, 
           "nighttime_afd"= night_counts_trends, 
           "percent_nighttime_afd"= night_fraction_trends,
-          "frp_MW_per_afd"=night_frp_trends, 
-          "frp_MW_per_overpass"=adj_night_frp_trends, .id="id")%>%
+          "frp_MW_per_afd"=night_frp_trends.id="id")%>%
   filter(p<0.05) %>% 
   mutate(Trend = ifelse(beta > 0, "positive", "negative")) %>%
   group_by(Trend, id) %>%
@@ -431,7 +612,7 @@ bind_rows("daytime_afd"=day_counts_trends,
   
 
 # TIME SERIES BY LANDCOVER TYPE ================================================
-# koppen look up tables=========================================================
+# koppen look up tables ========================================================
 lut_kop<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
 names(lut_kop) <- c(1,2,3,4,5)
 
@@ -849,6 +1030,13 @@ frp_ts <- long_df %>%
                                            units = "days"))) %>%
   mblm(mean_frp_per_detection~time, data=.);summary(frp_ts)
 
+day_frp_ts <- long_df %>%
+  filter(dn_detect == "day") %>%
+  dplyr::mutate(time = as.numeric(difftime(time1 = year_month, 
+                                           time2 = min(year_month), 
+                                           units = "days"))) %>%
+  mblm(mean_frp_per_detection~time, data=.);summary(day_frp_ts)
+
 bind_rows(day_afd_ts, night_afd_ts, nf_ts, frp_ts)-> global_trends
 
 # global predictions
@@ -924,11 +1112,12 @@ acf(resid(nf_gam$lme), lag.max = 36, main = "ACF")
 pacf(resid(nf_gam$lme), lag.max = 36, main = "pACF")
 layout(1)
 
-# MONTHLY by Koppen=============================================================
+# MONTHLY by Koppen ============================================================
 
 lut_kop<- c("Equatorial", "Arid", "Temperate", "Boreal", "Polar")
 names(lut_kop) <- c(1,2,3,4,5)
 
+# ts =====
 bind_rows(
 koppen_percent_n_night <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen_wide.csv") %>%
   mutate(value = prop_n_night*100)%>%
@@ -993,6 +1182,64 @@ koppen_trends %>%
          bs = paste(round(beta,5),sig))  %>%
   pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
   write_csv("out/koppen_trends_pretty_day.csv")
+
+# gam ====
+bind_rows(
+  koppen_percent_n_night <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen_wide.csv") %>%
+    mutate(value = prop_n_night*100)%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_kop[koppen])%>%
+    parallel_gamm_lc() %>%
+    mutate(variable = "percent_afd_night")
+  ,
+  koppen_day_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+    filter(dn_detect == "day")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_kop[koppen]) %>%
+    dplyr::rename(value = n_per_op_per_Mkm2)%>%
+    parallel_gamm_lc() %>%
+    mutate(variable = "day_afd_per_op_per_Mkm2")
+  ,
+  koppen_night_afd <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+    filter(dn_detect == "night")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_kop[koppen]) %>%
+    dplyr::rename(value = n_per_op_per_Mkm2)%>%
+    parallel_gamm_lc() %>%
+    mutate(variable = "night_afd_per_op_per_Mkm2")
+  ,
+  koppen_night_frp <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")%>%
+    filter(dn_detect == "night")%>%
+    dplyr::mutate(timestep = as.numeric(difftime(time1 = year_month, 
+                                                 time2 = min(year_month), 
+                                                 units = "days")),
+                  cell = lut_kop[koppen]) %>%
+    dplyr::rename(value = mean_frp_per_detection)%>%
+    parallel_gamm_lc() %>%
+    mutate(variable = "mean_frp_per_detection")
+)-> koppen_trends_gamm
+
+koppen_trends_gamm %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         sign = ifelse(beta>0, "+", "-"),
+         sign_sig = ifelse(p<0.05, sign, sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "sign_sig") %>%
+  write_csv("out/koppen_trends_pretty_gamm.csv")
+
+koppen_trends_gamm %>%
+  dplyr::select(-n) %>%
+  mutate(sig = ifelse(p<0.05, "*", ""),
+         bs = paste(round(beta*365.25,2),sig))  %>%
+  pivot_wider(id_cols = cell, names_from = "variable", values_from = "bs") %>%
+  write_csv("out/koppen_trends_pretty_year_gamm.csv")
+##
 
 # MONTHLY by landcover =========================================================
 lck_tab <- read_csv("in/csvs_from_michael/koppen-modis-landcover-lookup-table.csv")
