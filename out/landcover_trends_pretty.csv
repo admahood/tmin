@@ -1,26 +1,27 @@
-cell,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_detection
-Equatorial Evergreen Broadleaf Forests,-,,-,-
-Equatorial Deciduous Broadleaf Forests,+,,+,
-Equatorial Woody Savannas,+,-,,+
-Equatorial Savannas,,-,,
-Equatorial Grasslands,,-,,
-Equatorial Permanent Wetlands,-,,-,
-Equatorial Croplands,,-,-,-
-Equatorial Cropland Natural Vegetation Mosaics,-,-,-,-
-Arid Open Shrublands,-,+,,
-Arid Woody Savannas,+,+,+,
-Arid Savannas,+,+,+,
-Arid Grasslands,+,-,-,+
-Arid Croplands,+,,+,+
-Temperate Evergreen Needleleaf Forests,+,,+,+
-Temperate Evergreen Broadleaf Forests,+,-,,+
-Temperate Deciduous Broadleaf Forests,-,-,-,-
-Temperate Woody Savannas,,-,-,
-Temperate Savannas,+,,,-
-Temperate Grasslands,,,,
-Temperate Croplands,,-,,-
-Boreal Evergreen Needleleaf Forests,+,,+,+
-Boreal Woody Savannas,+,,,+
-Boreal Savannas,+,-,,+
-Boreal Grasslands,+,-,-,
-Boreal Croplands,+,-,,+
+Koppen,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_night_detection,mean_frp_per_day_detection
+Equatorial Evergreen Broadleaf Forests,,,,-,-
+Equatorial Deciduous Broadleaf Forests,+,,+,,-
+Equatorial Woody Savannas,,-,,+,-
+Equatorial Savannas,,-,-,-,-
+Equatorial Grasslands,,-,-,-,-
+Equatorial Permanent Wetlands,,,,,-
+Equatorial Croplands,-,-,-,-,-
+Equatorial Cropland Natural Vegetation Mosaics,-,-,-,-,
+Arid Open Shrublands,,+,+,,+
+Arid Woody Savannas,+,+,+,,+
+Arid Savannas,+,+,+,,+
+Arid Grasslands,,-,-,,
+Arid Croplands,,,-,,-
+Temperate Evergreen Needleleaf Forests,+,,+,+,
+Temperate Evergreen Broadleaf Forests,,-,-,,+
+Temperate Deciduous Broadleaf Forests,-,-,-,-,-
+Temperate Woody Savannas,,-,-,,+
+Temperate Savannas,,,-,,+
+Temperate Grasslands,,,,,
+Temperate Croplands,-,-,,-,-
+Boreal Evergreen Needleleaf Forests,+,+,+,+,+
+Boreal Woody Savannas,+,,,+,+
+Boreal Savannas,+,,,+,+
+Boreal Grasslands,+,-,-,,
+Boreal Croplands,+,-,,+,-
+Global,+,-,-,+,-

@@ -1,5 +1,6 @@
-cell,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_detection
-Equatorial,,-,-,
-Arid,+,,+,+
-Temperate,+,-,,+
-Boreal,+,,,+
+Koppen,percent_afd_night,day_afd_per_op_per_Mkm2,night_afd_per_op_per_Mkm2,mean_frp_per_night_detection,mean_frp_per_day_detection
+Equatorial,,-,-,-,-
+Arid,+,,,+,
+Temperate,,-,-,,+
+Boreal,+,-,,+,
+Global,+,-,-,+,-
