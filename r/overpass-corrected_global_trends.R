@@ -18,7 +18,8 @@ library(viridis)
 library(ggpubr)
 library(broom)
 
-posneg_cols <- c("Positive"="orange", "Negative"=viridis(2)[1])
+posneg_cols <- c("Positive"="#CF6630", "Negative"="#07484D") # colours.cafe palette 582
+mask_col<- #DDCEBF
 daynight_cols <- c("#B2182B","#2166AC") # red is #B2182B
 dir.create("out")
 
@@ -412,8 +413,10 @@ p_dc<-ggplot(day_counts_trends %>% filter(p<0.05) %>%
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = posneg_cols)+
   theme_void()+
-  labs(caption="Daytime Active Fire Detections") + 
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+  labs(caption="Daytime Active Fire Detections")+
+  ylim(c(-52.625, 75.125)) + 
+  theme(text = element_text(family="DejaVuSans"),
+        plot.caption = element_text(hjust=0.5, size=rel(1.2)),
         legend.position = "none",
         legend.justification = c(0,0),
         panel.background = element_rect(color = "black", size=1)) +
@@ -444,7 +447,7 @@ if(!file.exists("data/night_counts_trends.Rda")){
   
   save(night_counts_trends, file="data/night_counts_trends.Rda")
   }else{
-  load("data/night_counts_trends")}
+  load("data/night_counts_trends.Rda")}
 
 p_nc<-ggplot(night_counts_trends %>% filter(p<0.05) %>% 
          mutate(Trend = ifelse(beta > 0, "Positive", "Negative"))) +
@@ -455,8 +458,10 @@ p_nc<-ggplot(night_counts_trends %>% filter(p<0.05) %>%
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = posneg_cols)+
   theme_void()+
-  labs(caption="Nighttime Active Fire Detections") + 
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+  labs(caption="Nighttime Active Fire Detections") +
+  ylim(c(-52.625, 75.125)) + 
+  theme(text = element_text(family="DejaVuSans"),
+        plot.caption = element_text(hjust=0.5, size=rel(1.2)),
         legend.position = "none",
         legend.justification = c(0,0),
         panel.background = element_rect(color = "black", size=1)) +
@@ -499,8 +504,10 @@ p_nf<-ggplot(night_fraction_trends %>% filter(p<0.05) %>%
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = posneg_cols)+
   theme_void()+
-  labs(caption="Percent Nighttime Active Fire Detections") + 
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+  labs(caption="Percent Nighttime Active Fire Detections")+
+  ylim(c(-52.625, 75.125)) + 
+  theme(text = element_text(family="DejaVuSans"),
+        plot.caption = element_text(hjust=0.5, size=rel(1.2)),
         legend.position = "none",
         legend.justification = c(0,0),
         panel.background = element_rect(color = "black", size=1)) +
@@ -531,7 +538,7 @@ if(!file.exists("data/night_frp_trends.Rda")){
                                       minimum_sample = 10)%>%
     left_join(dc_area,by=c("y"="lat"))
   
-  save(night_frp_trends, "data/night_frp_trends.Rda")
+  save(night_frp_trends,file= "data/night_frp_trends.Rda")
 }else{
   load("data/night_frp_trends.Rda")
 }
@@ -544,14 +551,14 @@ p_frp <- ggplot(night_frp_trends %>% filter(p<0.05) %>%
   geom_raster(aes(x=x,y=y,fill=Trend)) +
   scale_fill_manual(values = posneg_cols)+
   theme_void()+
-  labs(caption="Nighttime Fire Radiative Power") + 
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+  labs(caption="Nighttime Fire Radiative Power")+
+  ylim(c(-52.625, 75.125)) + 
+  theme(text = element_text(family="DejaVuSans"),
+        plot.caption = element_text(hjust=0.5, size=rel(1.2)),
         legend.position = "none",
         legend.justification = c(0,0),
         panel.background = element_rect(color = "black", size=1)) +
   ggsave("out/night_frp_trend_1_deg_2003-2020.png")
-
-save(night_frp_trends, file = "night_frp_mean_trends.Rda")
 
 ## 4pan plot ======================================================
 
@@ -561,21 +568,21 @@ df_legend <- tibble(x=c(1,2,3), y=c(1,2,3),
   geom_raster() +
   theme_transparent()+
   # theme(legend.title = element_blank())+
-  scale_fill_manual(values = c("grey90",viridis(2)[1], "orange")) 
+  scale_fill_manual(values = c("grey90",posneg_cols[2], posneg_cols[1])) 
 
 trend_leg<-get_legend(df_legend)
 
 # all together
 p_trends<-ggarrange(p_dc, p_nc, p_nf, p_frp,
           nrow = 2, ncol=2,
-          labels = c("a.", "b.", "c.", "d."), 
+          labels = c("a", "b", "c", "d"), 
           font.label = "bold",
           label.y = 0.99)
 
 ggdraw()+
   draw_plot(p_trends) +
   draw_plot(df_legend, .015,.12,.1,.1) +
-ggsave(height = 6.5, width=12, filename = "out/annual_4pan.png")
+ggsave(height = 5, width=12, filename = "out/annual_4pan.png")
 
 # table of trends per area =====================================================
 
@@ -1193,35 +1200,13 @@ p_nf_single <-ggplot(night_fraction_trends %>% filter(p<0.05) %>%
   geom_raster(aes(x=x,y=y,fill=`Trend in Percent Night Active Fire Detections`)) +
   scale_fill_manual(values = posneg_cols)+
   theme_void()+
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+  ylim(c(-52.625, 75.125)) + 
+  theme(text = element_text(family="DejaVuSans"),
+        plot.caption = element_text(hjust=0.5, size=rel(1.2)),
         legend.position = "bottom",
         legend.text = element_text(size = 30),
         legend.title = element_text(size=30),
         panel.background = element_rect(color = "black", size=2))
-
-us_day<-df_frp_day %>%
-  mutate(unseasoned = observation -seasonal,
-         preds = predict(day_frp_ts))
-
-us_night<-df_frp_night %>%
-  mutate(unseasoned = observation -seasonal,
-         preds = predict(frp_ts))
-
-
-p_inset<-bind_rows(predict(day_frp_ts, interval = "confidence")%>% as.data.frame,
-          predict(frp_ts, interval = "confidence") %>%as.data.frame)%>%
-  cbind(bind_rows("Day"=us_day, "Night"=us_night, .id="FRP"))%>%
-  ggplot(aes(x=date, y=unseasoned, color = FRP)) +
-  geom_point(alpha=0.25) +
-  geom_line(aes(y=fit)) +
-  geom_line(aes(y=upr), lty=2)+
-  geom_line(aes(y=lwr), lty=2)+
-  scale_color_manual(values=daynight_cols)+
-  ylab("MW per detection (seasonal component removed)")+
-  xlab("date") +
-  theme_clean()
-
-
 
 diff_val<-filter(long_df, acq_year==2003, dn_detect=="day")%>% 
   pull(mean_frp_per_detection)-
@@ -1252,19 +1237,25 @@ p_inset2 <- long_df %>%
   theme(axis.line=element_blank(),
         axis.text.y.left = element_text(color = daynight_cols[1], size=20),
         axis.text.y.right = element_text(color = daynight_cols[2], size=20),
-        legend.position = c(0,.9),
+        axis.text.x.bottom = element_text(size=20), 
+        axis.ticks = element_blank(),
+        legend.position = c(0.01,.95),
         legend.justification = c(0,1),
         legend.text = element_text(size=15),
         legend.title = element_blank(),
         plot.title = element_text(hjust=0.5, size=20),
         panel.grid.major.y = element_blank(),
-        panel.background = element_rect(color = "black", size=1))+
-  xlab("Year"); p_inset2
+        panel.background = element_rect(color = "black", 
+                                        size=1, 
+                                        fill="transparent"))+
+  scale_x_continuous(breaks = c(2003, 2020), 
+                     labels = c("   2003", "2020   "),
+                     name=""); p_inset2
 
 
 
 ggdraw() +
   draw_plot(p_nf_single) +
   draw_plot(p_inset2, 0.02,0.2, 0.25,0.29) +
-  ggsave("out/percent_night_w_inset.png", height=10, width=20)
+  ggsave("out/percent_night_w_inset.png", height=8, width=20)
 

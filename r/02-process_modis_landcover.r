@@ -5,7 +5,7 @@ library(raster)
 dir.create("data/MCD12Q1_tifs/")
 # getting the tifs
 
-years<- 2016:2019
+years <- 2016:2019
 
 for(y in years){
   system(paste0("aws s3 sync s3://earthlab-natem/modis-burned-area/input/landcover/",y, " data/MCD12Q1/", y))

@@ -23,7 +23,7 @@ lut_lc<-c( "Evergreen Needleleaf Forests",
            "Grasslands",
            "Permanent Wetlands",
            "Croplands",
-           "Urban and Built-up Lands",
+           "Urban and Built-up",
            "Cropland Natural Vegetation Mosaics",
            "Permanent Snow and Ice",
            "Barren",
@@ -31,7 +31,9 @@ lut_lc<-c( "Evergreen Needleleaf Forests",
 names(lut_lc) <- str_pad(1:17, width = 2, side = "left",pad = "0")
 
 # color palette ================================================================
-df_colors <- read_csv("data/landcover-colors-2021.csv")
+df_colors <- read_csv("data/landcover-colors-2021.csv") %>%
+  mutate(lc_name= replace(lc_name, lc_name == "Urban and Built-up Lands",
+                          "Urban and Built-up"))
 lc_cols <- pull(df_colors, color)
 names(lc_cols) <- pull(df_colors, lc_name)
 
@@ -109,16 +111,21 @@ p1 <- ggplot(lck_df) +
   geom_raster(aes(x=x,y=y,fill=Koppen)) +
   coord_equal() +
   theme_void()+
-  labs(caption="Koppen-Gieger Climate Classification") + 
+  labs(caption="Köppen-Geiger Climate Classification") + 
   theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
   # ggtitle("Koppen-Gieger Climate Classification") +
   theme(legend.justification = c(0,0),
         legend.position = c(0.05,0.2),
+        text = element_text(family="DejaVuSans"),
         legend.title = element_blank(),
         plot.title = element_text(hjust = 0.5),
-        panel.background = element_rect(color = "black", size=1))
+        panel.background = element_rect(color = "black", size=1)) +
+  ylim(c(-52.625, 75.125))
 
-p2 <- ggplot(lck_df) +
+p2 <- ggplot(lck_df%>%
+               mutate(Landcover, replace(Landcover, 
+                                       Landcover == "Urban and Built-up Lands",
+                                       "Urban and Built-up"))) +
   geom_raster(aes(x=x,y=y,fill=Landcover))  +
   coord_equal() +
   theme_void()+
@@ -126,24 +133,28 @@ p2 <- ggplot(lck_df) +
   theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
   # ggtitle("MOD12Q1 Landcover Classification") +
   theme(legend.title = element_blank(),
+        text = element_text(family="DejaVuSans"),
         legend.position = "bottom",
         plot.title = element_text(hjust = 0.5),
         panel.background = element_rect(color = "black", size=1))+
-  scale_fill_manual(values = lc_cols);p2
+  scale_fill_manual(values = lc_cols)+
+  ylim(c(-52.625, 75.125))
 
 p3 <- ggplot(lck_df) +
   geom_raster(aes(x=x,y=y,fill=Burnable)) +
   coord_equal() +
   theme_void()+
   # ggtitle("Burnable Land Area") +
-  labs(caption="Burnable Land Area (> 100 fires December 2017 - June 2020)") + 
+  labs(caption="Burnable Land Area (> 100 fires 2017 - 2020)") + 
   theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
   theme(legend.justification = c(0,0),
         legend.position = c(0.05,0.2),
+        text = element_text(family="DejaVuSans"),
         legend.title = element_blank(),
         plot.title = element_text(hjust = 0.5),
         panel.background = element_rect(color = "black", size=1)) +
-  scale_fill_manual(values = c("firebrick", "grey"))
+  scale_fill_manual(values = c("firebrick", "grey"))+
+  ylim(c(-52.625, 75.125))
 
 leg2 <- get_legend(p2)
 
@@ -151,9 +162,11 @@ leg2 <- get_legend(p2)
 plots <- ggarrange(p1,
                    p2 + theme(legend.position = "none"), leg2, p3,
                    ncol=1, nrow=4,
-                   heights = c(2,2,0.75, 2),labels = c("a.", "b.", "","c."),font.label = "bold") +
+                   heights = c(2,2,0.75, 2),
+                   labels = c("a", "b", "","c"),label.y = 0.95,
+                   font.label = "bold") +
 # ggarrange(plots, leg2, ncol=2, widths = c(5,2))+
-  ggsave(filename = "out/three_panel_lc_map.png", width = 8, height = 14)
+  ggsave(filename = "out/three_panel_lc_map.png", width = 8.5, height = 12)
 
 
 # grabbing some quick numbers for the paper
