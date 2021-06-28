@@ -1048,7 +1048,8 @@ p_afd <- ggplot(long_df, aes(x = year_month, y = n_per_op_per_Mkm2, color = dn_d
   scale_color_manual(values=daynight_cols)+
   theme_clean() +
   ggtitle("Active Fire Detections per Overpass per Mkm2")+
-  theme(legend.position = "none",
+  theme(text = element_text(family="DejaVuSans"),
+        legend.position = "none",
         axis.title = element_blank())
 
 p_np <- ggplot(wide_df, aes(x=year_month, y=percent_n_night)) +
@@ -1057,8 +1058,9 @@ p_np <- ggplot(wide_df, aes(x=year_month, y=percent_n_night)) +
   geom_line(data = preds_nf, aes(y=upr), lty=2)+
   geom_line(data = preds_nf, aes(y=lwr), lty=2)+
   theme_clean() +
-  ggtitle("Percent of Detections that Occurred at Night") +
-  theme(axis.title = element_blank())
+  ggtitle("Percent Nighttime Detections") +
+  theme(axis.title = element_blank(),
+        text = element_text(family="DejaVuSans"))
 
 p_frp <- ggplot(long_df, aes(x = year_month, y = mean_frp_per_detection, color = dn_detect)) +
   geom_line(alpha=0.75) +
@@ -1069,14 +1071,15 @@ p_frp <- ggplot(long_df, aes(x = year_month, y = mean_frp_per_detection, color =
   theme_clean() +
   ggtitle("Fire Radiative Power per Detection (MW)")+
   xlab("Date (Monthly Increments)")+
-  theme(legend.position = c(0,1),
+  theme(text = element_text(family="DejaVuSans"),
+        legend.position = c(0,1),
         legend.justification = c(0,1),
         legend.title = element_blank(),
         axis.title.y = element_blank())
 
-ggarrange(p_afd, p_np, p_frp, nrow=3) +
+ggarrange(p_afd, p_np, p_frp, nrow=3, labels = c("a", "","")) +
   ggsave(filename = "out/global_trends_line_plots.png",
-         height =12, width = 5)
+         height =12, width = 6)
 
 # MONTHLY koppen line plots ====================================================
 
@@ -1084,10 +1087,10 @@ ggarrange(p_afd, p_np, p_frp, nrow=3) +
 wide_df_k<-read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen_wide.csv") %>%
   mutate(percent_n_night = prop_n_night*100)%>%
   dplyr::mutate(time = as.numeric(difftime(time1 = year_month, time2 = min(year_month), units = "days"))) %>%
-  mutate(koppen = lut_kop[koppen])
+  mutate(koppen = lut_kop[koppen] %>% factor(levels = c("Equatorial", "Arid", "Temperate", "Boreal")))
 
-long_df_k <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv") %>%
-  mutate(koppen = lut_kop[koppen])
+long_df_k <- read_csv("in/csvs_from_michael/mcd14ml-trend-by-month-koppen.csv")  %>%
+  mutate(koppen = lut_kop[koppen] %>% factor(levels = c("Equatorial", "Arid", "Temperate", "Boreal")))
 
 p_k_afd <- ggplot(long_df_k, aes(x = year_month, y = n_per_op_per_Mkm2, color = dn_detect)) +
   geom_line(alpha=0.75) +
@@ -1096,7 +1099,8 @@ p_k_afd <- ggplot(long_df_k, aes(x = year_month, y = n_per_op_per_Mkm2, color = 
   facet_wrap(~koppen, nrow=1, ncol=4, scales = "free")+
   theme_clean() +
   ggtitle("Active Fire Detections per Overpass per Mkm2")+
-  theme(legend.position = "none",
+  theme(text = element_text(family="DejaVuSans"),
+        legend.position = "none",
         axis.title = element_blank())
 
 p_k_np <- ggplot(wide_df_k, aes(x=year_month, y=percent_n_night)) +
@@ -1105,7 +1109,8 @@ p_k_np <- ggplot(wide_df_k, aes(x=year_month, y=percent_n_night)) +
   facet_wrap(~koppen, nrow=1, ncol=4, scales = "free")+
   geom_smooth(method="lm")+
   ggtitle("Percent of Detections that Occurred at Night") +
-  theme(axis.title = element_blank())
+  theme(text = element_text(family="DejaVuSans"),
+        axis.title = element_blank())
 
 p_k_frp <- ggplot(long_df_k, aes(x = year_month, y = mean_frp_per_detection, color = dn_detect)) +
   geom_line(alpha=0.75) + 
@@ -1115,12 +1120,13 @@ p_k_frp <- ggplot(long_df_k, aes(x = year_month, y = mean_frp_per_detection, col
   theme_clean() +
   ggtitle("Fire Radiative Power per Detection (MW)")+
   xlab("Date (Monthly Increments)")+
-  theme(legend.position = c(0,1),
+  theme(text = element_text(family="DejaVuSans"),
+        legend.position = c(0,1),
         legend.justification = c(0,1),
         legend.title = element_blank(),
         axis.title.y = element_blank())
 
-ggarrange(p_k_afd, p_k_np, p_k_frp, nrow=3) +
+ggarrange(p_k_afd, p_k_np, p_k_frp, nrow=3, labels = c("b", "", "")) +
   ggsave(filename = "out/global_trends_by_koppen_line_plots.png",
          height =12, width =12)
 
