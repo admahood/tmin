@@ -112,15 +112,15 @@ p1 <- ggplot(lck_df) +
   coord_equal() +
   theme_void()+
   labs(caption="Köppen-Geiger Climate Classification") + 
-  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
-  # ggtitle("Koppen-Gieger Climate Classification") +
-  theme(legend.justification = c(0,0),
+  scale_y_continuous(limits = c(-57.625, 78.125),expand = c(0,0))+
+  theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)),
+        legend.justification = c(0,0),
         legend.position = c(0.05,0.2),
         text = element_text(family="DejaVuSans"),
         legend.title = element_blank(),
         plot.title = element_text(hjust = 0.5),
-        panel.background = element_rect(color = "black", size=1)) +
-  ylim(c(-52.625, 75.125))
+        panel.background = element_rect(color = "black", size=1),
+        panel.spacing.y = unit(0, "lines"))
 
 p2 <- ggplot(lck_df%>%
                mutate(Landcover, replace(Landcover, 
@@ -128,23 +128,22 @@ p2 <- ggplot(lck_df%>%
                                        "Urban and Built-up"))) +
   geom_raster(aes(x=x,y=y,fill=Landcover))  +
   coord_equal() +
-  theme_void()+
+  theme_void() +
   labs(caption="MOD12Q1 Landcover Classification") + 
   theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
-  # ggtitle("MOD12Q1 Landcover Classification") +
+  scale_y_continuous(limits = c(-57.625, 78.125),expand = c(0,0))+
   theme(legend.title = element_blank(),
         text = element_text(family="DejaVuSans"),
         legend.position = "bottom",
         plot.title = element_text(hjust = 0.5),
         panel.background = element_rect(color = "black", size=1))+
-  scale_fill_manual(values = lc_cols)+
-  ylim(c(-52.625, 75.125))
+  scale_fill_manual(values = lc_cols)
 
 p3 <- ggplot(lck_df) +
   geom_raster(aes(x=x,y=y,fill=Burnable)) +
   coord_equal() +
   theme_void()+
-  # ggtitle("Burnable Land Area") +
+  scale_y_continuous(limits = c(-57.625, 78.125),expand = c(0,0))+
   labs(caption="Burnable Land Area (> 100 fires 2017 - 2020)") + 
   theme(plot.caption = element_text(hjust=0.5, size=rel(1.2)))+
   theme(legend.justification = c(0,0),
@@ -153,9 +152,7 @@ p3 <- ggplot(lck_df) +
         legend.title = element_blank(),
         plot.title = element_text(hjust = 0.5),
         panel.background = element_rect(color = "black", size=1)) +
-  scale_fill_manual(values = c("firebrick", "grey"))+
-  ylim(c(-52.625, 75.125))
-
+  scale_fill_manual(values = c("firebrick", "grey"))
 leg2 <- get_legend(p2)
 
 
@@ -165,9 +162,15 @@ plots <- ggarrange(p1,
                    heights = c(2,2,0.75, 2),
                    labels = c("a", "b", "","c"),label.y = 0.95,
                    font.label = "bold") +
-# ggarrange(plots, leg2, ncol=2, widths = c(5,2))+
-  ggsave(filename = "out/three_panel_lc_map.png", width = 8.5, height = 12)
+  ggsave(filename = "out/EDF-1three_panel_lc_map.png", width = 8.5, height = 12)
 
+plots <- ggarrange(p1,
+                   p2 + theme(legend.position = "none"), leg2, p3,
+                   ncol=1, nrow=4,
+                   heights = c(2,2,0.75, 2),
+                   labels = c("a", "b", "","c"),label.y = 0.95,
+                   font.label = "bold") +
+  ggsave(filename = "out/EDF-1_three_panel_lc_map.svg", width = 8.5, height = 12)
 
 # grabbing some quick numbers for the paper
 # earth has 148940000 km2 of land surface area (from wikipedia)
